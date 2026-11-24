@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist/ship2ship/browser"
+  "outputDirectory": "dist/ship2ship/browser",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://stssunrichdemotesting-production.up.railway.app/api/:path*"
+    }
+  ]
 }
