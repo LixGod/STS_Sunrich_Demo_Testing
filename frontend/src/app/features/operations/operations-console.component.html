@@ -1,0 +1,581 @@
+<s2s-page-header [heading]="data()?.jobNumber ?? ''" [subtitle]="'ops.title' | translate">
+  <p-button [label]="'ops.jobOverview' | translate" icon="pi pi-arrow-left" [text]="true" [routerLink]="['/jobs', jobId()]" />
+  <p-button [label]="'ops.refresh' | translate" icon="pi pi-refresh" [outlined]="true" [loading]="loading()" (onClick)="reload()" />
+  <p-button [label]="'ops.finalReport' | translate" icon="pi pi-file" [text]="true" [routerLink]="['/jobs', jobId(), 'final-report']" />
+</s2s-page-header>
+
+@if (offline.storageError()) { <p-message severity="error" role="alert" [text]="'ops.offline.unreadable' | translate" /> }
+
+@if (pendingEvents().length) {
+  <section class="s2s-panel">
+    <h2>{{ 'ops.offline.title' | translate }}</h2><p>{{ 'ops.offline.hint' | translate }}</p>
+    @for (draft of pendingEvents(); track draft.id) {
+      <article class="card">
+        <strong>{{ draft.input.typeCode }} · {{ (draft.input.occurredAt || draft.input.startedAt) | utcDateTime: zone() }}</strong>
+        @if (draft.input.remarks) { <p>{{ draft.input.remarks }}</p> }
+        @if (draft.error) { <p role="alert">{{ draft.error | translate }}</p> }
+        @if (draft.discardedReason) { <p>{{ 'ops.offline.discarded' | translate }}: {{ draft.discardedReason }}</p> }
+        @else {
+          <label>{{ 'ops.offline.reviewReason' | translate }}<input #reviewReason maxlength="500" /></label>
+          <div class="actions">
+            <button type="button" [disabled]="saving()" (click)="syncDraft(draft, reviewReason.value)">{{ 'ops.offline.sync' | translate }}</button>
+            <button type="button" [disabled]="saving()" (click)="reviewDraft(draft)">{{ 'common.edit' | translate }}</button>
+            <button type="button" [disabled]="saving() || !reviewReason.value.trim()" (click)="offline.discard(draft, reviewReason.value)">{{ 'ops.offline.discard' | translate }}</button>
+          </div>
+        }
+      </article>
+    }
+  </section>
+}
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') { <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" /> }
+  </p-message>
+}
+
+@if (data(); as d) {
+  <nav class="tabs" [attr.aria-label]="'ops.sections' | translate">
+    @for (t of tabs; track t) {
+      @if ((t !== 'incidents' || d.permissions.incidentRead) && (t !== 'movements' || canReadMovements())) {
+        <button type="button" [class.active]="tab() === t" [attr.aria-current]="tab() === t ? 'page' : null" (click)="tab.set(t)">
+          {{ 'ops.tab.' + t | translate }}
+          @if (t === 'incidents' && openIncidents()) { <span class="badge">{{ openIncidents() }}</span> }
+        </button>
+      }
+    }
+  </nav>
+  <p class="s2s-muted hint">{{ 'ops.timesIn' | translate: { zone: d.timezone } }}</p>
+
+  <!-- Overview -->
+  @if (tab() === 'overview') {
+    <section class="s2s-panel">
+      <header class="section-head">
+        <h2>{{ 'ops.eta' | translate }}</h2>
+        @if (d.permissions.write) { <p-button [label]="'ops.recordEta' | translate" icon="pi pi-clock" size="small" (onClick)="openEta()" /> }
+      </header>
+      <div class="cards">
+        @for (v of d.vessels; track v.jobVesselId) {
+          <article class="card">
+            <strong>{{ 'ops.role.' + v.role | translate }}</strong>
+            <span class="s2s-muted">{{ v.name }}</span>
+            @if (v.current; as c) {
+              <span class="big">{{ c.etaUtc | utcDateTime: c.timezone }}</span>
+              <span class="s2s-muted">{{ 'ops.etaSource.' + c.source | translate }}
+                @if (c.changeHours !== null) { · {{ 'ops.etaChange' | translate: { hours: c.changeHours } }} }</span>
+            } @else {
+              <span class="s2s-muted">{{ 'ops.noEta' | translate }}</span>
+            }
+            @if (v.history.length > 1) {
+              <details>
+                <summary>{{ 'ops.etaHistory' | translate: { count: v.history.length } }}</summary>
+                <ul class="plain">
+                  @for (h of v.history; track h.revisionNo) {
+                    <li>{{ h.etaUtc | utcDateTime: h.timezone }} · {{ 'ops.etaSource.' + h.source | translate }}@if (h.recordedByName) { · {{ h.recordedByName }} }
+                      @if (h.note) { — <em>{{ h.note }}</em> }</li>
+                  }
+                </ul>
+              </details>
+            }
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="s2s-panel">
+      <h2>{{ 'ops.cargoProgress' | translate }}</h2>
+      @for (g of d.cargo; track g.lineNo) {
+        <div class="progress-row">
+          <span><strong>{{ g.gradeName }}</strong> · {{ g.cumulative ?? 0 }} / {{ g.planned }} {{ g.unitCode }}</span>
+          <p-progressbar [value]="progress(g)" [showValue]="false" [attr.aria-label]="g.gradeName" />
+          @if (g.completed) { <p-tag [value]="'ops.completed' | translate" severity="success" /> }
+          @else if (g.estimatedCompletion) { <span class="s2s-muted">{{ 'ops.etc' | translate: { at: (g.estimatedCompletion | utcDateTime: d.timezone) } }}</span> }
+        </div>
+      } @empty {
+        <p class="s2s-muted">{{ 'ops.noCargo' | translate }}</p>
+      }
+    </section>
+
+    <section class="s2s-panel">
+      <h2>{{ 'ops.lastEvents' | translate }}</h2>
+      <ul class="plain">
+        @for (e of d.events.slice(-5); track e.id) {
+          <li [class.voided]="e.status === 'VOIDED'">{{ (e.occurredAt ?? e.startedAt) | utcDateTime: d.timezone }} · {{ e.typeLabel }}</li>
+        } @empty {
+          <li class="s2s-muted">{{ 'ops.noEvents' | translate }}</li>
+        }
+      </ul>
+      @if (d.permissions.incidentRead) {
+        <p class="s2s-muted">{{ 'ops.openSummary' | translate: { delays: openDelays(), incidents: openIncidents() } }}</p>
+      }
+    </section>
+  }
+
+  <!-- Events -->
+  @if (tab() === 'events') {
+    <section class="s2s-panel">
+      <header class="section-head">
+        <h2>{{ 'ops.stepsTitle' | translate }}</h2>
+        @if (d.permissions.write) {
+          <p-button [label]="'ops.otherEvent' | translate" icon="pi pi-plus" [text]="true" size="small" (onClick)="openEvent(null)" />
+        }
+      </header>
+      <p class="s2s-muted hint">{{ (d.permissions.write ? 'ops.stepsHint' : 'ops.stepsReadOnly') | translate }}</p>
+      <ul class="ticks">
+        @for (row of checklist(); track row.type.code) {
+          <li>
+            <strong>{{ row.type.label }}</strong>
+            <div class="step-vessels">
+              @for (vessel of row.vessels; track vessel.value) {
+                <div class="vessel-step" [class.ticked]="vessel.event">
+                  <label>
+                    <input type="checkbox" [attr.aria-label]="row.type.label + ' · ' + vessel.label"
+                      [checked]="!!vessel.event" [disabled]="!!vessel.event || !d.permissions.write || saving()"
+                      (change)="tick(row.type.code, vessel.value)" />
+                    <span>{{ vessel.label }}</span>
+                  </label>
+                  @if (vessel.event; as e) {
+                    <span class="when">{{ (e.occurredAt ?? e.startedAt) | utcDateTime: d.timezone }}</span>
+                    @if (d.permissions.write) {
+                      <p-button [label]="'ops.changeTime' | translate" icon="pi pi-pencil" [text]="true" size="small" (onClick)="openEvent(e)" />
+                    }
+                  }
+                </div>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <details class="s2s-panel log">
+      <summary><h2>{{ 'ops.eventLog' | translate }}</h2></summary>
+      @for (v of d.vessels; track v.jobVesselId) {
+      <section class="vessel-events">
+        <h3>{{ 'ops.role.' + v.role | translate }} · {{ v.name }}</h3>
+      @for (e of eventsForVessel(v.jobVesselId); track e.id) {
+        <article class="item" [class.voided]="e.status === 'VOIDED'">
+          <div class="item-head">
+            <strong>{{ e.typeLabel }}</strong>
+            <span class="tags">
+              @if (e.corrected) { <p-tag [value]="'ops.corrected' | translate" severity="info" /> }
+              @if (e.status === 'VOIDED') { <s2s-status-tag status="VOIDED" /> }
+            </span>
+          </div>
+          <div class="when">
+            @if (e.interval) {
+              {{ e.startedAt | utcDateTime: d.timezone }} – @if (e.endedAt) { {{ e.endedAt | utcDateTime: d.timezone }} } @else { {{ 'ops.ongoing' | translate }} }
+            } @else {
+              {{ e.occurredAt | utcDateTime: d.timezone }}
+            }
+            @if (!e.jobVesselId) { · {{ 'ops.bothVessels' | translate }} }
+          </div>
+          @if (e.remarks) { <p class="pre">{{ e.remarks }}</p> }
+          <p class="s2s-muted meta">{{ 'ops.eventSource.' + e.source | translate }} · {{ e.recordedByName }}
+            @if (e.voidReason) { · {{ 'ops.voidedBecause' | translate: { reason: e.voidReason } }} }</p>
+          <div class="actions">
+            @if (d.permissions.write && e.status === 'ACTIVE') {
+              <p-button [label]="'ops.correct' | translate" icon="pi pi-pencil" [text]="true" size="small" (onClick)="openEvent(e)" />
+              <p-button [label]="'ops.void' | translate" icon="pi pi-ban" [text]="true" severity="danger" size="small" (onClick)="openVoid(e, 'void-event')" />
+            }
+            @if (e.corrected) {
+              <p-button [label]="'ops.history' | translate" icon="pi pi-history" [text]="true" size="small" (onClick)="showHistory('events', e.id)" />
+            }
+          </div>
+        </article>
+      } @empty {
+        <p class="s2s-muted">{{ 'ops.noEvents' | translate }}</p>
+      }
+      </section>
+      }
+    </details>
+  }
+
+  <!-- Cargo -->
+  @if (tab() === 'cargo') {
+    @for (g of d.cargo; track g.lineNo) {
+      <section class="s2s-panel">
+        <header class="section-head">
+          <h2>{{ g.gradeName }} <span class="s2s-muted">({{ g.gradeCode }})</span></h2>
+          @if (g.completed) { <p-tag [value]="'ops.completed' | translate" severity="success" /> }
+          @if (d.permissions.cargoWrite) { <p-button [label]="'ops.addReading' | translate" icon="pi pi-plus" size="small" (onClick)="openReading(g)" /> }
+        </header>
+        <dl class="facts">
+          <div><dt>{{ 'ops.planned' | translate }}</dt><dd>{{ g.planned }} {{ g.unitCode }}</dd></div>
+          <div><dt>{{ 'ops.cumulative' | translate }}</dt><dd>{{ g.cumulative ?? '—' }} {{ g.unitCode }}</dd></div>
+          <div><dt>{{ 'ops.balance' | translate }}</dt><dd>{{ g.balance }} {{ g.unitCode }}</dd></div>
+          <div><dt>{{ 'ops.rate' | translate }}</dt><dd>@if (g.lastRatePerHour !== null) { {{ g.lastRatePerHour }} {{ g.unitCode }}/h } @else { — }</dd></div>
+          <div class="wide"><dt>{{ 'ops.etcLabel' | translate }}</dt>
+            <dd>@if (g.estimatedCompletion) { {{ g.estimatedCompletion | utcDateTime: d.timezone }} <span class="s2s-muted">({{ 'ops.estimate' | translate }})</span> } @else { — }</dd></div>
+        </dl>
+        <p-progressbar [value]="progress(g)" [attr.aria-label]="g.gradeName" />
+        <div class="table-wrap">
+          <table class="grid">
+            <thead><tr>
+              <th scope="col">{{ 'ops.time' | translate }}</th><th scope="col" class="num">{{ 'ops.cumulative' | translate }}</th>
+              <th scope="col" class="num">{{ 'ops.since' | translate }}</th><th scope="col" class="num">{{ 'ops.rate' | translate }}</th>
+              <th scope="col">{{ 'ops.kind' | translate }}</th>
+            </tr></thead>
+            <tbody>
+              @for (r of g.readings; track r.id) {
+                <tr>
+                  <td>{{ r.readAt | utcDateTime: d.timezone }}</td><td class="num">{{ r.cumulative }}</td>
+                  <td class="num">{{ r.quantitySincePrevious ?? '—' }}</td><td class="num">{{ r.ratePerHour ?? '—' }}</td>
+                  <td>{{ 'ops.readingKind.' + r.kind | translate }}@if (r.reason) { — <em>{{ r.reason }}</em> }@if (r.remarks) { · {{ r.remarks }} }</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="s2s-muted">{{ 'ops.noReadings' | translate }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    } @empty {
+      <section class="s2s-panel"><s2s-empty-state messageKey="ops.noCargo" icon="pi pi-box" /></section>
+    }
+  }
+
+  <!-- Delays and incidents -->
+  @if (tab() === 'incidents' && d.permissions.incidentRead) {
+    <section class="s2s-panel">
+      <header class="section-head">
+        <h2>{{ 'ops.delays' | translate }}</h2>
+        @if (d.permissions.incidentWrite) { <p-button [label]="'ops.addDelay' | translate" icon="pi pi-plus" size="small" (onClick)="openDelay(null)" /> }
+      </header>
+      @for (x of d.delays; track x.id) {
+        <article class="item" [class.voided]="x.status === 'VOIDED'">
+          <div class="item-head">
+            <strong>{{ x.categoryLabel }}</strong>
+            <span class="tags">
+              @if (!x.endedAt && x.status === 'ACTIVE') { <p-tag [value]="'ops.ongoing' | translate" severity="warn" /> }
+              @if (x.corrected) { <p-tag [value]="'ops.corrected' | translate" severity="info" /> }
+              @if (x.status === 'VOIDED') { <s2s-status-tag status="VOIDED" /> }
+            </span>
+          </div>
+          <div class="when">{{ x.startedAt | utcDateTime: d.timezone }} – @if (x.endedAt) { {{ x.endedAt | utcDateTime: d.timezone }} } @else { {{ 'ops.ongoing' | translate }} }</div>
+          <p class="pre">{{ x.description }}</p>
+          @for (f of x.files; track f.id) { <button type="button" class="link" (click)="view(f)">{{ f.name }}</button> }
+          <div class="actions">
+            @if (d.permissions.incidentWrite && x.status === 'ACTIVE') {
+              <p-button [label]="'ops.edit' | translate" icon="pi pi-pencil" [text]="true" size="small" (onClick)="openDelay(x)" />
+              <label class="file-button">
+                <i class="pi pi-paperclip" aria-hidden="true"></i> {{ 'ops.attach' | translate }}
+                <input type="file" accept="application/pdf,image/png,image/jpeg" (change)="attach($event, 'DELAY', x.id)" />
+              </label>
+              <p-button [label]="'ops.void' | translate" icon="pi pi-ban" [text]="true" severity="danger" size="small" (onClick)="openVoid(x, 'void-delay')" />
+            }
+            @if (x.corrected) { <p-button [label]="'ops.history' | translate" icon="pi pi-history" [text]="true" size="small" (onClick)="showHistory('delays', x.id)" /> }
+          </div>
+        </article>
+      } @empty {
+        <p class="s2s-muted">{{ 'ops.noDelays' | translate }}</p>
+      }
+    </section>
+
+    <section class="s2s-panel">
+      <header class="section-head">
+        <h2>{{ 'ops.incidents' | translate }}</h2>
+        @if (d.permissions.incidentWrite) { <p-button [label]="'ops.reportIncident' | translate" icon="pi pi-exclamation-triangle" size="small" severity="danger" (onClick)="openIncident(null)" /> }
+      </header>
+      @for (i of d.incidents; track i.id) {
+        <article class="item">
+          <div class="item-head">
+            <strong>{{ i.categoryLabel }} · {{ i.severityLabel }}</strong>
+            <span class="tags">
+              <s2s-status-tag [status]="i.status" />
+              @if (i.corrected) { <p-tag [value]="'ops.corrected' | translate" severity="info" /> }
+            </span>
+          </div>
+          <div class="when">{{ i.occurredAt | utcDateTime: d.timezone }} · {{ 'ops.reportedBy' | translate: { name: i.reportedByName } }}</div>
+          <p class="pre">{{ i.description }}</p>
+          @if (i.immediateActions) { <p class="pre"><strong>{{ 'ops.immediateActions' | translate }}:</strong> {{ i.immediateActions }}</p> }
+          @if (i.actions.length) {
+            <ul class="plain">
+              @for (a of i.actions; track a.id) {
+                <li><i [class]="a.doneAt ? 'pi pi-check-circle' : 'pi pi-circle'" aria-hidden="true"></i> {{ a.text }}
+                  @if (a.ownerName) { · {{ a.ownerName }} }@if (a.dueDate) { · {{ 'ops.due' | translate: { date: a.dueDate } }} }</li>
+              }
+            </ul>
+          }
+          @for (f of i.files; track f.id) { <button type="button" class="link" (click)="view(f)">{{ f.name }}</button> }
+          @if (i.closedAt) { <p class="s2s-muted meta">{{ 'ops.closedBy' | translate: { name: i.closedByName, at: (i.closedAt | utcDateTime: d.timezone) } }} — {{ i.closingNote }}</p> }
+          <div class="actions">
+            @if (d.permissions.incidentWrite && i.status !== 'CLOSED') {
+              <p-button [label]="'ops.edit' | translate" icon="pi pi-pencil" [text]="true" size="small" (onClick)="openIncident(i)" />
+              <label class="file-button">
+                <i class="pi pi-paperclip" aria-hidden="true"></i> {{ 'ops.attach' | translate }}
+                <input type="file" accept="application/pdf,image/png,image/jpeg" (change)="attach($event, 'INCIDENT', i.id)" />
+              </label>
+            }
+            @if (i.canReview) { <p-button [label]="'ops.startReview' | translate" icon="pi pi-search" [text]="true" size="small" (onClick)="startReview(i)" /> }
+            @if (i.canClose) { <p-button [label]="'ops.closeIncident' | translate" icon="pi pi-check" [text]="true" size="small" (onClick)="openClose(i)" /> }
+            @if (i.corrected) { <p-button [label]="'ops.history' | translate" icon="pi pi-history" [text]="true" size="small" (onClick)="showHistory('incidents', i.id)" /> }
+          </div>
+        </article>
+      } @empty {
+        <p class="s2s-muted">{{ 'ops.noIncidents' | translate }}</p>
+      }
+    </section>
+  }
+
+  <!-- SOF -->
+  @if (tab() === 'sof') {
+    <section class="s2s-panel">
+      <p class="s2s-muted hint">{{ 'ops.sofHint' | translate }}</p>
+      <div class="actions">
+        <a class="p-button p-button-outlined link-button" [href]="sofUrl(null)" target="_blank" rel="noopener">
+          <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ 'ops.draftSof' | translate }}</a>
+        @if (d.permissions.write) { <p-button [label]="'ops.prepareSof' | translate" icon="pi pi-send" [loading]="saving()" (onClick)="prepareSof()" /> }
+      </div>
+      @for (s of d.sofRevisions; track s.id) {
+        <article class="item">
+          <div class="item-head"><strong>{{ 'ops.sofRevision' | translate: { no: s.revisionNo } }}</strong><s2s-status-tag [status]="s.status" /></div>
+          <p class="s2s-muted meta">{{ 'ops.sofPrepared' | translate: { count: s.eventCount, name: s.preparedByName, at: (s.preparedAt | utcDateTime: d.timezone) } }}
+            @if (s.issuedAt) { · {{ 'ops.sofIssued' | translate: { name: s.issuedByName, at: (s.issuedAt | utcDateTime: d.timezone) } }} }</p>
+          @if (s.pdfSha256) { <p class="hash s2s-muted">SHA-256: <code>{{ s.pdfSha256 }}</code></p> }
+          <div class="actions">
+            <a class="p-button p-button-text link-button" [href]="sofUrl(s)" target="_blank" rel="noopener">
+              <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ (s.pdfSha256 ? 'ops.issuedPdf' : 'ops.draftPdf') | translate }}</a>
+            @if (s.canIssue) { <p-button [label]="'ops.issueSof' | translate" icon="pi pi-verified" size="small" (onClick)="sofAction(s, 'issue')" /> }
+            @if (s.canWithdraw) { <p-button [label]="'ops.withdraw' | translate" icon="pi pi-undo" [text]="true" size="small" (onClick)="sofAction(s, 'withdraw')" /> }
+          </div>
+          @if (s.status === 'PREPARED' && !s.canIssue && d.permissions.approve) { <p class="s2s-muted meta">{{ 'ops.ownSof' | translate }}</p> }
+        </article>
+      } @empty {
+        <p class="s2s-muted">{{ 'ops.noSof' | translate }}</p>
+      }
+    </section>
+  }
+
+  <!-- Jetty departures and returns -->
+  @if (tab() === 'movements') {
+    <s2s-movements-page [jobId]="jobId()" [embedded]="true" />
+  }
+}
+
+<!-- ETA dialog -->
+<p-dialog [header]="'ops.recordEta' | translate" [visible]="dialog() === 'eta'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [style]="{ width: 'min(32rem, 96vw)' }">
+  @if (dialog() === 'eta') {
+    @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+    <form [formGroup]="etaForm" (ngSubmit)="saveEta()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="ops.vessel" fieldId="eta-vessel" [control]="etaForm.controls.jobVesselId" [required]="true">
+        <p-select inputId="eta-vessel" formControlName="jobVesselId" [options]="vesselOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.newEta" fieldId="eta-at" [control]="etaForm.controls.eta" [required]="true">
+        <s2s-date-time-picker inputId="eta-at" formControlName="eta" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.timezone" fieldId="eta-tz" [control]="etaForm.controls.timezone">
+        <p-select inputId="eta-tz" formControlName="timezone" [options]="timezoneOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.source" fieldId="eta-source" [control]="etaForm.controls.source">
+        <p-select inputId="eta-source" formControlName="source" [options]="etaSourceOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.note" fieldId="eta-note" [control]="etaForm.controls.note">
+        <input pInputText id="eta-note" formControlName="note" maxlength="500" />
+      </s2s-form-field>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveEta()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Event dialog (record or correct) -->
+<p-dialog [header]="(editingEvent() ? 'ops.correctEvent' : 'ops.recordEvent') | translate" [visible]="dialog() === 'event'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(34rem, 96vw)' }">
+  @if (dialog() === 'event') {
+    @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+    <form [formGroup]="eventForm" (ngSubmit)="saveEvent()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="ops.eventType" fieldId="ev-type" [control]="eventForm.controls.typeCode" [required]="true">
+        <p-select inputId="ev-type" formControlName="typeCode" [options]="typeOptions()" optionLabel="label" optionValue="value" appendTo="body"
+          [filter]="true" [placeholder]="'common.select' | translate" />
+      </s2s-form-field>
+      @if (eventInterval()) {
+        <s2s-form-field labelKey="ops.start" fieldId="ev-start" [control]="eventForm.controls.startedAt" [required]="true">
+          <s2s-date-time-picker inputId="ev-start" formControlName="startedAt" appendTo="body" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="ops.end" fieldId="ev-end" [control]="eventForm.controls.endedAt" hintKey="ops.endHint">
+          <s2s-date-time-picker inputId="ev-end" formControlName="endedAt" appendTo="body" [clearable]="true" />
+        </s2s-form-field>
+      } @else {
+        <s2s-form-field labelKey="ops.time" fieldId="ev-at" [control]="eventForm.controls.occurredAt" [required]="true">
+          <s2s-date-time-picker inputId="ev-at" formControlName="occurredAt" appendTo="body" />
+        </s2s-form-field>
+      }
+      <s2s-form-field labelKey="ops.vessel" fieldId="ev-vessel" [control]="eventForm.controls.jobVesselId">
+        <p-select inputId="ev-vessel" formControlName="jobVesselId" [options]="eventVesselOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="ops.remarks" fieldId="ev-remarks" [control]="eventForm.controls.remarks">
+          <textarea pTextarea id="ev-remarks" formControlName="remarks" rows="2" maxlength="1000"></textarea>
+        </s2s-form-field>
+      </details>
+      @if (editingEvent()) {
+        <s2s-form-field labelKey="ops.reason" fieldId="ev-reason" [control]="eventForm.controls.reason" [required]="true" hintKey="ops.reasonHint">
+          <input pInputText id="ev-reason" formControlName="reason" maxlength="500" />
+        </s2s-form-field>
+      }
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveEvent()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Cargo reading dialog -->
+<p-dialog [header]="'ops.addReadingFor' | translate: { grade: grade()?.gradeName ?? '' }" [visible]="dialog() === 'reading'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(30rem, 96vw)' }">
+  @if (dialog() === 'reading') {
+    @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+    <form [formGroup]="readingForm" (ngSubmit)="saveReading()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="ops.cumulativeIn" fieldId="rd-value" [control]="readingForm.controls.cumulative" [required]="true">
+        <div class="with-unit"><input pInputText id="rd-value" formControlName="cumulative" inputmode="decimal" /><span>{{ grade()?.unitCode }}</span></div>
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.kind" fieldId="rd-kind" [control]="readingForm.controls.kind">
+        <p-select inputId="rd-kind" formControlName="kind" [options]="kindOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.time" fieldId="rd-at" [control]="readingForm.controls.readAt" [required]="true">
+        <s2s-date-time-picker inputId="rd-at" formControlName="readAt" appendTo="body" />
+      </s2s-form-field>
+      @if (readingForm.controls.kind.value === 'CORRECTION') {
+        <s2s-form-field labelKey="ops.reason" fieldId="rd-reason" [control]="readingForm.controls.reason" [required]="true">
+          <input pInputText id="rd-reason" formControlName="reason" maxlength="500" />
+        </s2s-form-field>
+      }
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="ops.remarks" fieldId="rd-remarks" [control]="readingForm.controls.remarks">
+          <input pInputText id="rd-remarks" formControlName="remarks" maxlength="500" />
+        </s2s-form-field>
+      </details>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveReading()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Delay dialog -->
+<p-dialog [header]="(editingDelay() ? 'ops.editDelay' : 'ops.addDelay') | translate" [visible]="dialog() === 'delay'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(32rem, 96vw)' }">
+  @if (dialog() === 'delay') {
+    @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+    <form [formGroup]="delayForm" (ngSubmit)="saveDelay()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="ops.category" fieldId="dl-cat" [control]="delayForm.controls.categoryCode" [required]="true">
+        <p-select inputId="dl-cat" formControlName="categoryCode" [options]="delayCategoryOptions()" optionLabel="label" optionValue="value" appendTo="body"
+          [placeholder]="'common.select' | translate" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.start" fieldId="dl-start" [control]="delayForm.controls.startedAt" [required]="true">
+        <s2s-date-time-picker inputId="dl-start" formControlName="startedAt" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.end" fieldId="dl-end" [control]="delayForm.controls.endedAt" hintKey="ops.endHint">
+        <s2s-date-time-picker inputId="dl-end" formControlName="endedAt" appendTo="body" [clearable]="true" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.description" fieldId="dl-desc" [control]="delayForm.controls.description" [required]="true">
+        <textarea pTextarea id="dl-desc" formControlName="description" rows="3" maxlength="2000"></textarea>
+      </s2s-form-field>
+      @if (editingDelay()) {
+        <s2s-form-field labelKey="ops.reason" fieldId="dl-reason" [control]="delayForm.controls.reason" [required]="true" hintKey="ops.reasonHint">
+          <input pInputText id="dl-reason" formControlName="reason" maxlength="500" />
+        </s2s-form-field>
+      }
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveDelay()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Incident dialog -->
+<p-dialog [header]="(editingIncident() ? 'ops.editIncident' : 'ops.reportIncident') | translate" [visible]="dialog() === 'incident'"
+  (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false" [style]="{ width: 'min(40rem, 96vw)' }">
+  @if (dialog() === 'incident') {
+    @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+    <form [formGroup]="incidentForm" (ngSubmit)="saveIncident()" novalidate class="dialog-form">
+      <div class="two">
+        <s2s-form-field labelKey="ops.category" fieldId="in-cat" [control]="incidentForm.controls.categoryCode" [required]="true">
+          <p-select inputId="in-cat" formControlName="categoryCode" [options]="incidentCategoryOptions()" optionLabel="label" optionValue="value" appendTo="body"
+            [placeholder]="'common.select' | translate" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="ops.severity" fieldId="in-sev" [control]="incidentForm.controls.severityCode" [required]="true">
+          <p-select inputId="in-sev" formControlName="severityCode" [options]="severityOptions()" optionLabel="label" optionValue="value" appendTo="body"
+            [placeholder]="'common.select' | translate" />
+        </s2s-form-field>
+      </div>
+      <s2s-form-field labelKey="ops.occurredAt" fieldId="in-at" [control]="incidentForm.controls.occurredAt" [required]="true">
+        <s2s-date-time-picker inputId="in-at" formControlName="occurredAt" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.description" fieldId="in-desc" [control]="incidentForm.controls.description" [required]="true">
+        <textarea pTextarea id="in-desc" formControlName="description" rows="3" maxlength="2000"></textarea>
+      </s2s-form-field>
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="ops.immediateActions" fieldId="in-imm" [control]="incidentForm.controls.immediateActions">
+          <textarea pTextarea id="in-imm" formControlName="immediateActions" rows="2" maxlength="2000"></textarea>
+        </s2s-form-field>
+      </details>
+      <h3>{{ 'ops.correctiveActions' | translate }}</h3>
+      <div formArrayName="actions" class="rows">
+        @for (a of incidentForm.controls.actions.controls; track a; let i = $index) {
+          <div class="row-card" [formGroupName]="i">
+            <s2s-form-field labelKey="ops.action" [fieldId]="'ac-text-' + i" [control]="a.controls.text" [required]="true">
+              <input pInputText [id]="'ac-text-' + i" formControlName="text" maxlength="500" />
+            </s2s-form-field>
+            <s2s-form-field labelKey="ops.owner" [fieldId]="'ac-owner-' + i" [control]="a.controls.ownerName">
+              <input pInputText [id]="'ac-owner-' + i" formControlName="ownerName" maxlength="150" />
+            </s2s-form-field>
+            <s2s-form-field labelKey="ops.dueDate" [fieldId]="'ac-due-' + i" [control]="a.controls.dueDate">
+              <p-datepicker [inputId]="'ac-due-' + i" formControlName="dueDate" dateFormat="yy-mm-dd" appendTo="body" [showIcon]="true" />
+            </s2s-form-field>
+            <span class="check"><p-checkbox formControlName="done" [binary]="true" [inputId]="'ac-done-' + i" />
+              <label [for]="'ac-done-' + i">{{ 'ops.done' | translate }}</label></span>
+            <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="removeAction(i)" />
+          </div>
+        }
+      </div>
+      <p-button [label]="'ops.addAction' | translate" icon="pi pi-plus" [text]="true" (onClick)="addAction()" />
+      @if (editingIncident()) {
+        <s2s-form-field labelKey="ops.reason" fieldId="in-reason" [control]="incidentForm.controls.reason" [required]="true" hintKey="ops.reasonHint">
+          <input pInputText id="in-reason" formControlName="reason" maxlength="500" />
+        </s2s-form-field>
+      }
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveIncident()" />
+  </ng-template>
+</p-dialog>
+
+<s2s-reason-dialog [visible]="dialog() === 'void-event'" (visibleChange)="closeDialog($event)" headerKey="ops.voidEvent" messageKey="ops.voidHint"
+  confirmKey="ops.void" [reasonRequired]="true" [saving]="saving()" (confirmed)="voidEvent($event)" />
+<s2s-reason-dialog [visible]="dialog() === 'void-delay'" (visibleChange)="closeDialog($event)" headerKey="ops.voidDelay" messageKey="ops.voidHint"
+  confirmKey="ops.void" [reasonRequired]="true" [saving]="saving()" (confirmed)="voidDelay($event)" />
+<s2s-reason-dialog [visible]="dialog() === 'close-incident'" (visibleChange)="closeDialog($event)" headerKey="ops.closeIncident"
+  messageKey="ops.closeHint" confirmKey="ops.closeIncident" [reasonRequired]="true" [saving]="saving()" (confirmed)="closeIncident($event)" />
+
+<!-- History -->
+<p-dialog [header]="'ops.history' | translate" [visible]="dialog() === 'history'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [style]="{ width: 'min(36rem, 96vw)' }">
+  @for (c of changes(); track c.versionNo) {
+    <article class="item">
+      <p class="meta"><strong>{{ c.changedAt | utcDateTime: zone() }}</strong> · {{ c.changedByName }} — <em>{{ c.reason }}</em></p>
+      <p class="s2s-muted meta">{{ 'ops.before' | translate }}</p>
+      <dl class="before">
+        @for (e of entries(c.before); track e.key) { <div><dt>{{ e.key }}</dt><dd>{{ e.value }}</dd></div> }
+      </dl>
+    </article>
+  }
+</p-dialog>
+
+<p-dialog [header]="viewing()?.name ?? ''" [visible]="dialog() === 'view'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [maximizable]="true" [style]="{ width: 'min(60rem, 96vw)' }">
+  <s2s-document-viewer [file]="viewing()" />
+</p-dialog>

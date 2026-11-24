@@ -1,0 +1,68 @@
+<s2s-page-header [heading]="'ops.listsTitle' | translate" [subtitle]="'ops.listsSubtitle' | translate">
+  <p-button [label]="'ops.addItem' | translate" icon="pi pi-plus" [outlined]="true" (onClick)="edit(null)" />
+</s2s-page-header>
+
+@if (errorKey(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+
+<nav class="tabs" [attr.aria-label]="'ops.listsTitle' | translate">
+  @for (l of lists; track l) {
+    <button type="button" [class.active]="current() === l" [attr.aria-current]="current() === l ? 'page' : null" (click)="select(l)">
+      {{ 'ops.list.' + l | translate }}
+    </button>
+  }
+</nav>
+
+<section class="s2s-panel">
+  <div class="table-wrap">
+    <table class="grid">
+      <thead><tr>
+        <th scope="col">{{ 'ops.code' | translate }}</th><th scope="col">{{ 'ops.label' | translate }}</th>
+        @if (isEventTypes()) { <th scope="col">{{ 'ops.phaseLabel' | translate }}</th> }
+        <th scope="col">{{ 'job.status' | translate }}</th><th scope="col"></th>
+      </tr></thead>
+      <tbody>
+        @for (item of items(); track item.code) {
+          <tr>
+            <td>{{ item.code }}</td>
+            <td>{{ item.label }}@if (item.interval) { <span class="s2s-muted"> · {{ 'ops.interval' | translate }}</span> }</td>
+            @if (isEventTypes()) { <td>{{ 'ops.phase.' + item.phase | translate }}</td> }
+            <td><s2s-status-tag [active]="item.active" /></td>
+            <td><p-button icon="pi pi-pencil" [text]="true" size="small" [ariaLabel]="'ops.edit' | translate" (onClick)="edit(item)" /></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="s2s-muted hint">{{ 'ops.listsHint' | translate }}</p>
+</section>
+
+<p-dialog [header]="(editing() ? 'ops.editItem' : 'ops.addItem') | translate" [visible]="open()" (visibleChange)="open.set($event)" [modal]="true"
+  [draggable]="false" [style]="{ width: 'min(30rem, 96vw)' }">
+  @if (open()) {
+    @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="ops.code" fieldId="li-code" [control]="form.controls.code" [required]="true" hintKey="ops.codeHint">
+        <input pInputText id="li-code" formControlName="code" maxlength="40" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="ops.label" fieldId="li-label" [control]="form.controls.label" [required]="true">
+        <input pInputText id="li-label" formControlName="label" maxlength="100" />
+      </s2s-form-field>
+      @if (isEventTypes()) {
+        <s2s-form-field labelKey="ops.phaseLabel" fieldId="li-phase" [control]="form.controls.phase">
+          <p-select inputId="li-phase" formControlName="phase" [options]="phaseOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+        </s2s-form-field>
+        <p class="check"><p-checkbox formControlName="interval" [binary]="true" inputId="li-interval" />
+          <label for="li-interval">{{ 'ops.intervalHint' | translate }}</label></p>
+      }
+      <s2s-form-field labelKey="ops.order" fieldId="li-sort" [control]="form.controls.sortOrder">
+        <input pInputText id="li-sort" type="number" formControlName="sortOrder" min="0" max="9999" />
+      </s2s-form-field>
+      <p class="check"><p-checkbox formControlName="active" [binary]="true" inputId="li-active" />
+        <label for="li-active">{{ 'ops.inUse' | translate }}</label></p>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="open.set(false)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="save()" />
+  </ng-template>
+</p-dialog>

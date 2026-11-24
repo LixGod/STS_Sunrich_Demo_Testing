@@ -1,0 +1,126 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+h3 {
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+  color: var(--s2s-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.client-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  label { font-size: 0.875rem; }
+  input { width: 100%; }
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.vessels {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 992px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.vessel {
+  padding: 0.75rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+  min-width: 0;
+}
+
+.cargo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cargo-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+
+  @media (min-width: 768px) {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .remove {
+    align-self: center;
+  }
+}
+
+.duplicates {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--s2s-border);
+  }
+}
+
+.reason {
+  flex-basis: 100%;
+  font-size: 0.875rem;
+}
+
+.audit summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+:host ::ng-deep .p-select,
+:host ::ng-deep .p-autocomplete,
+:host ::ng-deep .p-autocomplete-input,
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-datepicker {
+  width: 100%;
+}

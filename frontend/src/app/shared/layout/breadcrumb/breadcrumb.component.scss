@@ -1,0 +1,28 @@
+ol {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--s2s-text-muted);
+}
+
+li + li::before {
+  content: '/';
+  margin: 0 0.45rem;
+  color: #c4bfbb;
+  font-weight: 500;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+
+  &:hover {
+    color: var(--s2s-brand);
+    text-decoration: underline;
+  }
+}

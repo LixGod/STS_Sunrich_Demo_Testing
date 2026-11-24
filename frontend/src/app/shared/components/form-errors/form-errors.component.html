@@ -1,0 +1,9 @@
+@if (message(); as error) {
+  <small class="error" [attr.id]="errorId()" role="alert">
+    @if (error.text) {
+      {{ error.text }}
+    } @else {
+      {{ error.key | translate: error.params }}
+    }
+  </small>
+}

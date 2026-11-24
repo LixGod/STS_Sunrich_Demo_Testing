@@ -1,0 +1,17 @@
+:host { display: block; }
+header, footer { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+header h2 { font-size: 1.05rem; }
+label { display: inline-flex; flex-direction: column; gap: .25rem; margin: .5rem; }
+article { padding: .85rem 0; border-bottom: 1px solid var(--s2s-border); overflow-wrap: anywhere; }
+article.escalated { border-left: 3px solid var(--p-orange-500); padding-left: 0.75rem; }
+button {
+  margin: .25rem;
+  padding: .45rem .8rem;
+  min-height: 2.4rem;
+  cursor: pointer;
+  border: 1px solid var(--s2s-border);
+  border-radius: 0.65rem;
+  background: var(--s2s-surface);
+  font: inherit;
+}
+fieldset { margin-top: .75rem; }

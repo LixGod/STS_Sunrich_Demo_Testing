@@ -1,0 +1,56 @@
+<s2s-page-header [heading]="'weather.parametersTitle' | translate" [subtitle]="'weather.parametersSubtitle' | translate">
+  @if (canWrite()) {
+    <p-button [label]="'weather.addParameter' | translate" icon="pi pi-plus" [outlined]="true" (onClick)="edit(null)" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" [text]="key | translate" />
+}
+
+<section class="s2s-panel">
+  <div class="table-wrap">
+    <table class="grid">
+      <thead><tr>
+        <th scope="col">{{ 'weather.code' | translate }}</th><th scope="col">{{ 'weather.label' | translate }}</th>
+        <th scope="col">{{ 'weather.unit' | translate }}</th><th scope="col">{{ 'job.status' | translate }}</th><th scope="col"></th>
+      </tr></thead>
+      <tbody>
+        @for (p of parameters(); track p.code) {
+          <tr>
+            <td>{{ p.code }}</td><td>{{ p.label }}</td><td>{{ p.unit }}</td><td><s2s-status-tag [active]="p.active" /></td>
+            <td>@if (canWrite()) { <p-button icon="pi pi-pencil" [text]="true" size="small" [ariaLabel]="'weather.editParameter' | translate" (onClick)="edit(p)" /> }</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<p-dialog [header]="(editing() ? 'weather.editParameter' : 'weather.addParameter') | translate" [visible]="open()" (visibleChange)="open.set($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(30rem, 96vw)' }">
+  @if (open()) {
+    @if (dialogError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="weather.code" fieldId="wp-code" [control]="form.controls.code" [required]="true" hintKey="weather.codeHint">
+        <input pInputText id="wp-code" formControlName="code" maxlength="40" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="weather.label" fieldId="wp-label" [control]="form.controls.label" [required]="true">
+        <input pInputText id="wp-label" formControlName="label" maxlength="100" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="weather.unit" fieldId="wp-unit" [control]="form.controls.unit" [required]="true">
+        <input pInputText id="wp-unit" formControlName="unit" maxlength="20" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="weather.sortOrder" fieldId="wp-sort" [control]="form.controls.sortOrder">
+        <input pInputText id="wp-sort" type="number" formControlName="sortOrder" min="0" max="9999" />
+      </s2s-form-field>
+      <p class="check"><p-checkbox formControlName="active" [binary]="true" inputId="wp-active" /> <label for="wp-active">{{ 'weather.active' | translate }}</label></p>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="open.set(false)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="save()" />
+  </ng-template>
+</p-dialog>

@@ -1,0 +1,427 @@
+<header><h1>{{ 'jobFinance.title' | translate }} · {{ data()?.summary?.jobNumber }}</h1>
+  <a [routerLink]="['/jobs', jobId()]">{{ 'jobFinance.back' | translate }}</a></header>
+<p class="muted">{{ 'jobFinance.roles' | translate }}</p>
+<nav class="tabs" [attr.aria-label]="'jobFinance.tabs.label' | translate">
+  @for (t of tabs(); track t.key) {
+    <a [routerLink]="[]" [queryParams]="{ tab: t.key }" [class.active]="t.key === active()" [attr.aria-current]="t.key === active() ? 'page' : null">
+      <i [class]="t.icon" aria-hidden="true"></i>{{ 'jobFinance.tabs.' + t.key | translate }}
+    </a>
+  }
+</nav>
+@if (error()) { <p class="feedback error" role="alert">{{ error().startsWith('errors.') ? (error() | translate) : error() }}</p> }
+@if (loadingSections().length) { <p class="muted" role="status">{{ 'common.loading' | translate }}</p> }
+@if (loadErrors().length) {
+  <div class="feedback error" role="alert">
+    <p>{{ 'jobFinance.partialLoadFailed' | translate }}</p>
+    <ul>@for (section of loadErrors(); track section) { <li>{{ 'jobFinance.sections.' + section | translate }}</li> }</ul>
+    <button type="button" (click)="reload()">{{ 'common.retry' | translate }}</button>
+  </div>
+}
+@if (data(); as current) {
+  @switch (active()) {
+    @case ('estimate') {
+      <section class="s2s-panel">
+        <div class="head"><h2>{{ 'jobFinance.estimate.title' | translate }}</h2>
+          @if (current.job && canReadEstimate()) { <a [routerLink]="['/commercial/enquiries', current.job.enquiryId, 'estimate']">{{ 'jobFinance.estimate.open' | translate }}</a> }</div>
+        <p class="muted">{{ 'jobFinance.estimate.hint' | translate }}</p>
+        @if (current.job; as job) {
+          <dl class="summary-figures">
+            <div><dt>{{ 'jobFinance.estimate.quotation' | translate }}</dt><dd>{{ job.quotationReference }}</dd></div>
+            <div><dt>{{ 'jobFinance.estimate.quoted' | translate }}</dt><dd>{{ job.currency }} {{ job.quotedAmount }}</dd></div>
+            @if (current.clock; as c) { <div><dt>{{ 'jobFinance.estimate.basis' | translate }}</dt><dd>{{ 'jobFinance.extra.hours' | translate: { hours: c.clock.basisHours } }}</dd></div> }
+          </dl>
+        }
+      </section>
+      @if (current.summary; as summary) {
+        <section class="s2s-panel">
+          <div class="head"><h2>{{ 'jobFinance.budget' | translate }} · {{ summary.currency }}</h2>
+            <a [href]="url('costs/summary.xlsx')" download>{{ 'jobFinance.export' | translate }}</a></div>
+          @if (summary.warnings.length) { <ul class="warnings" role="status">@for (w of summary.warnings; track $index) { <li>{{ w.message }}</li> }</ul> }
+          <dl class="summary-figures">
+            <div><dt>{{ 'jobFinance.budgetAmount' | translate }}</dt><dd>{{ summary.currency }} {{ summary.budget }}</dd></div>
+            <div><dt>{{ 'jobFinance.committed' | translate }}</dt><dd>{{ summary.currency }} {{ summary.committed }}</dd></div>
+            <div><dt>{{ 'jobFinance.actualNet' | translate }}</dt><dd>{{ summary.currency }} {{ summary.actualNet }}</dd></div>
+            <div><dt>{{ 'jobFinance.variance' | translate }}</dt><dd>{{ summary.currency }} {{ summary.variance }}</dd></div>
+          </dl>
+          <details><summary>Cost head breakdown</summary>
+          <div class="table-wrap"><table><thead><tr>
+            <th>{{ 'jobFinance.costHead' | translate }}</th><th>{{ 'jobFinance.budgetAmount' | translate }}</th>
+            <th>{{ 'jobFinance.committed' | translate }}</th><th>{{ 'jobFinance.actualNet' | translate }}</th>
+            <th>{{ 'jobFinance.tax' | translate }}</th><th>{{ 'jobFinance.variance' | translate }}</th><th>{{ 'jobFinance.varianceToCommitment' | translate }}</th>
+          </tr></thead><tbody>
+            @for (head of summary.heads; track head.code) { <tr><th scope="row">{{ head.code }} · {{ head.name }}</th><td>{{ head.budget }}</td><td>{{ head.committed }}</td><td>{{ head.actualNet }}</td><td>{{ head.actualTax }}</td><td>{{ head.variance }}</td><td>{{ head.varianceToCommitment }}</td></tr> }
+            <tr><th scope="row">{{ 'jobFinance.total' | translate }}</th><td>{{ summary.budget }}</td><td>{{ summary.committed }}</td><td>{{ summary.actualNet }}</td><td>{{ summary.actualTax }}</td><td>{{ summary.variance }}</td><td></td></tr>
+          </tbody></table></div>
+          </details>
+        </section>
+      }
+    }
+    @case ('expenses') {
+      <section class="s2s-panel">
+        <div class="head">
+          <h2>{{ 'jobFinance.documents' | translate }}</h2>
+          @if (canWrite()) {
+            <div class="top-bar expenses-toolbar">
+              <div class="search-box">
+                <input id="cost-vendor-search" [placeholder]="'jobFinance.findVendor' | translate" [(ngModel)]="vendorQuery" (keydown.enter)="reload()" />
+                <button type="button" (click)="reload()"><i class="pi pi-search" aria-hidden="true"></i> {{ 'table.search' | translate }}</button>
+              </div>
+              <button type="button" class="btn-primary-action" [disabled]="loadingSections().includes('options') || loadErrors().includes('options')" (click)="edit()">
+                <i class="pi pi-plus" aria-hidden="true"></i> {{ 'jobFinance.new' | translate }}
+              </button>
+            </div>
+          }
+        </div>
+        @if (editor; as form) {
+          @let totals = costTotals();
+          <form (ngSubmit)="saveCost()" class="editor">
+            @if (fieldErrors().length) {
+              <ul class="warnings wide" role="alert">@for (e of fieldErrors(); track e.field) { <li><strong>{{ e.field }}</strong>: {{ e.message }}</li> }</ul>
+            }
+            <label>{{ 'jobFinance.type' | translate }}<select name="kind" [(ngModel)]="form.kind" [disabled]="!!editing"><option value="BILL">{{ 'jobFinance.bill' | translate }}</option><option value="PO">{{ 'jobFinance.po' | translate }}</option></select></label>
+            <label>{{ 'jobFinance.vendor' | translate }}<select name="vendor" [(ngModel)]="form.vendorId" required><option value="">{{ 'common.select' | translate }}</option>@for (vendor of current.options?.vendors; track vendor.id) { <option [value]="vendor.id">{{ vendor.name }}</option> }</select></label>
+            <label>{{ 'jobFinance.reference' | translate }}<input name="reference" [(ngModel)]="form.reference" required maxlength="100" /></label>
+            <label>{{ 'jobFinance.date' | translate }}<input type="date" name="date" [(ngModel)]="form.documentDate" required /></label>
+            <label>{{ 'jobFinance.due' | translate }}<input type="date" name="due" [(ngModel)]="form.dueDate" /></label>
+            <label>{{ 'jobFinance.currency' | translate }}<input name="currency" list="job-cost-currencies" [(ngModel)]="form.currency" required pattern="[A-Z]{3}" maxlength="3" /></label>
+            <datalist id="job-cost-currencies">@for (currency of current.options?.currencies; track currency.code) { <option [value]="currency.code">{{ currency.code }} — {{ currency.name }}</option> }</datalist>
+            @if (form.currency.toUpperCase() !== current.options?.baseCurrency) {
+              <label>{{ 'jobFinance.baseFx' | translate }} ({{ form.currency }} → {{ current.options?.baseCurrency }})<input name="baseRate" type="number" min="0.00000001" step="any" [(ngModel)]="form.baseRate" required /></label>
+              <label>{{ 'jobFinance.rateSource' | translate }}<input name="baseRateSource" [(ngModel)]="form.baseRateSource" required maxlength="100" /></label>
+            }
+            @if (form.currency.toUpperCase() !== current.options?.jobCurrency) {
+              <label>{{ 'jobFinance.jobFx' | translate }} ({{ form.currency }} → {{ current.options?.jobCurrency }})<input name="jobRate" type="number" min="0.00000001" step="any" [(ngModel)]="form.jobRate" required /></label>
+              <label>{{ 'jobFinance.rateSource' | translate }}<input name="jobRateSource" [(ngModel)]="form.jobRateSource" required maxlength="100" /></label>
+            }
+            @if (form.kind === 'BILL') {
+              <label>{{ 'jobFinance.purchaseOrder' | translate }}<select name="po" [(ngModel)]="form.purchaseOrderId"><option [ngValue]="null">{{ 'common.select' | translate }}</option>@for (po of current.options?.purchaseOrders; track po.id) { @if (po.vendorId === form.vendorId) { <option [value]="po.id">{{ po.number ?? po.reference }}</option> } }</select></label>
+            }
+            <label>{{ 'jobFinance.evidence' | translate }}
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="uploadCost($event)" />
+              @if (form.fileId) { <span class="evidence-pill ok"><i class="pi pi-check" aria-hidden="true"></i> {{ 'jobFinance.evidenceAttached' | translate }}</span> }
+              @else if (form.kind === 'BILL') { <span class="evidence-pill req"><i class="pi pi-exclamation-circle" aria-hidden="true"></i> {{ 'jobFinance.evidenceRequired' | translate }}</span> }
+            </label>
+            <div class="wide cost-lines-section">
+              <div class="cost-lines-head">
+                <h3>{{ 'jobFinance.lineItems' | translate }}</h3>
+                <div class="cost-lines-actions">
+                  @if (current.options?.estimateLines?.length) {
+                    <button type="button" class="btn-import-quote" (click)="importFromQuote()">
+                      <i class="pi pi-download" aria-hidden="true"></i> {{ 'jobFinance.importQuote' | translate }}
+                    </button>
+                  }
+                  <button type="button" class="btn-add-line" (click)="addLine()">
+                    <i class="pi pi-plus" aria-hidden="true"></i> {{ 'jobFinance.addLine' | translate }}
+                  </button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="cost-table">
+                  <thead>
+                    <tr>
+                      <th style="min-width: 12rem">{{ 'jobFinance.costHead' | translate }}</th>
+                      <th style="min-width: 14rem">{{ 'jobFinance.description' | translate }}</th>
+                      <th style="min-width: 5.5rem" class="num">{{ 'jobFinance.quantity' | translate }}</th>
+                      <th style="min-width: 7rem" class="num">{{ 'jobFinance.price' | translate }}</th>
+                      <th style="min-width: 7rem" class="num">{{ 'jobFinance.total' | translate }}</th>
+                      <th style="width: 3rem"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (line of form.lines; track $index; let index = $index) {
+                      <tr>
+                        <td>
+                          <select [name]="'head-' + index" [ngModel]="line.costHeadCode" (ngModelChange)="chooseHead(line, $event)" required>
+                            <option value="">{{ 'common.select' | translate }}</option>
+                            @for (head of current.options?.heads; track head.code) {
+                              <option [value]="head.code">{{ head.code }} · {{ head.name }}</option>
+                            }
+                          </select>
+                        </td>
+                        <td>
+                          <input [name]="'description-' + index" [(ngModel)]="line.description" required maxlength="300" placeholder="Description" />
+                        </td>
+                        <td>
+                          <input [name]="'quantity-' + index" [(ngModel)]="line.quantity" inputmode="decimal" type="number" step="any" min="0" required class="num-input" />
+                        </td>
+                        <td>
+                          <input [name]="'price-' + index" [(ngModel)]="line.unitPrice" inputmode="decimal" type="number" step="any" min="0" required class="num-input" placeholder="0.00" />
+                        </td>
+                        <td class="num line-total">
+                          {{ form.currency }} {{ formatMoney(totals.lines[index].amount, costMinorUnits()) }}
+                        </td>
+                        <td class="action-cell">
+                          @if (form.lines.length > 1) {
+                            <button type="button" class="btn-remove" (click)="form.lines.splice(index, 1)" [attr.aria-label]="'common.remove' | translate">
+                              <i class="pi pi-trash" aria-hidden="true"></i>
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div class="cost-summary-bar">
+                <div class="summary-chip">
+                  <span class="label">{{ 'jobFinance.actualNet' | translate }}:</span>
+                  <span class="value">{{ form.currency }} {{ formatMoney(totals.net, costMinorUnits()) }}</span>
+                </div>
+                @if (totals.tax.gt(0)) {
+                  <div class="summary-chip">
+                    <span class="label">{{ 'jobFinance.tax' | translate }}:</span>
+                    <span class="value">{{ form.currency }} {{ formatMoney(totals.tax, costMinorUnits()) }}</span>
+                  </div>
+                }
+                <div class="summary-chip grand">
+                  <span class="label">{{ 'jobFinance.total' | translate }}:</span>
+                  <span class="value">{{ form.currency }} {{ formatMoney(totals.gross, costMinorUnits()) }}</span>
+                </div>
+              </div>
+            </div>
+            <details class="wide"><summary>{{ 'common.moreDetails' | translate }}</summary>
+              <label>{{ 'jobFinance.notes' | translate }}<textarea name="notes" [(ngModel)]="form.notes" maxlength="2000"></textarea></label>
+            </details>
+            <div class="actions wide"><button type="submit" [disabled]="busy()">{{ 'common.save' | translate }}</button><button type="button" (click)="editor = null">{{ 'common.cancel' | translate }}</button></div>
+          </form>
+        }
+        @for (doc of current.costs.items; track doc.id) {
+          <article class="s2s-panel cost-card">
+            <div class="card-header cost-card-header">
+              <div class="card-title cost-card-title">
+                <span class="cost-kind-badge" [class.po]="doc.kind === 'PO'">{{ (doc.kind === 'PO' ? 'jobFinance.po' : 'jobFinance.bill') | translate }}</span>
+                <h3>{{ doc.number ?? doc.reference }}</h3>
+                <span class="cost-vendor">{{ doc.vendorName }}</span>
+              </div>
+              <s2s-status-tag [status]="doc.status" />
+            </div>
+
+            @if (doc.warnings.length) {
+              <ul class="warnings" role="status">@for (w of doc.warnings; track w.code) { <li>{{ w.message }}</li> }</ul>
+            }
+
+            <div class="cost-card-metrics">
+              <div class="cost-metric-group">
+                <span class="metric-label">{{ 'jobFinance.total' | translate }}</span>
+                <span class="metric-val primary">{{ doc.currency }} {{ doc.grossAmount }}</span>
+              </div>
+              <div class="cost-metric-group">
+                <span class="metric-label">{{ 'jobFinance.baseAmount' | translate }}</span>
+                <span class="metric-val">{{ doc.baseCurrency }} {{ doc.baseAmount }}</span>
+              </div>
+              <div class="cost-metric-group">
+                <span class="metric-label">{{ 'jobFinance.jobAmount' | translate }}</span>
+                <span class="metric-val">{{ doc.jobCurrency }} {{ doc.jobAmount }}</span>
+              </div>
+            </div>
+
+            @if (doc.jobRateSource || doc.baseRateSource) {
+              <p class="cost-rates-strip muted">
+                <i class="pi pi-arrows-h" aria-hidden="true"></i> {{ 'jobFinance.rates' | translate }}:
+                @if (doc.jobRateSource) { {{ doc.currency }}→{{ doc.jobCurrency }} <strong>{{ doc.jobRate }}</strong> ({{ doc.jobRateDate }}, {{ doc.jobRateSource }}) }
+                @if (doc.baseRateSource) { · {{ doc.currency }}→{{ doc.baseCurrency }} <strong>{{ doc.baseRate }}</strong> ({{ doc.baseRateDate }}, {{ doc.baseRateSource }}) }
+              </p>
+            }
+
+            @if (doc.fileId) {
+              <div class="cost-evidence-row">
+                <button type="button" class="btn-evidence" (click)="viewEvidence(doc.fileId)">
+                  <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ 'jobFinance.evidence' | translate }}
+                </button>
+              </div>
+            }
+
+            @if (doc.status === 'DRAFT' && doc.kind === 'BILL' && !doc.fileId) {
+              <p class="missing-evidence"><i class="pi pi-exclamation-triangle" aria-hidden="true"></i> {{ 'jobFinance.invoiceRequired' | translate }}</p>
+            }
+            @if (doc.decisionReason) { <p class="cost-decision-quote"><i class="pi pi-comment" aria-hidden="true"></i> {{ doc.decisionReason }}</p> }
+
+            <div class="actions card-actions cost-card-actions">
+              @if (doc.status === 'DRAFT' && canWrite()) {
+                <button type="button" (click)="edit(doc)"><i class="pi pi-pencil" aria-hidden="true"></i> {{ 'common.edit' | translate }}</button>
+                <button type="button" class="btn-submit-action" [disabled]="busy()" (click)="costAction(doc, 'SUBMIT')">
+                  <i class="pi pi-send" aria-hidden="true"></i> {{ 'jobFinance.submit' | translate }}
+                </button>
+              }
+              @if (doc.status === 'SUBMITTED' && canApproveDocument(doc) && doc.submittedBy !== actor()) {
+                <button type="button" class="btn-approve-action" [disabled]="busy()" (click)="costAction(doc, 'APPROVE')">
+                  <i class="pi pi-check" aria-hidden="true"></i> {{ 'jobFinance.approve' | translate }}
+                </button>
+                <button type="button" [disabled]="busy()" (click)="openReasonAction(doc, 'RETURN')">
+                  <i class="pi pi-undo" aria-hidden="true"></i> {{ 'jobFinance.return' | translate }}
+                </button>
+              }
+              @if (doc.status === 'APPROVED' && doc.kind === 'PO' && canApprovePo()) {
+                <button type="button" [disabled]="busy()" (click)="openReasonAction(doc, 'CLOSE')">
+                  <i class="pi pi-lock" aria-hidden="true"></i> {{ 'jobFinance.close' | translate }}
+                </button>
+              }
+              @if ((doc.status === 'APPROVED' || doc.status === 'CLOSED') && canApproveDocument(doc)) {
+                <button type="button" [disabled]="busy()" (click)="openReasonAction(doc, 'REVERSE')">
+                  <i class="pi pi-refresh" aria-hidden="true"></i> {{ 'jobFinance.reverse' | translate }}
+                </button>
+              }
+            </div>
+          </article>
+        } @empty { @if (!loadingSections().includes('costs') && !loadErrors().includes('costs')) { <p>{{ 'jobFinance.empty' | translate }}</p> } }
+        <div class="actions"><button type="button" [disabled]="page === 0 || loadingSections().includes('costs') || loadErrors().includes('costs')" (click)="page = page - 1; reload()">{{ 'finance.previous' | translate }}</button><button type="button" [disabled]="(page + 1) * 25 >= current.costs.totalElements || loadingSections().includes('costs') || loadErrors().includes('costs')" (click)="page = page + 1; reload()">{{ 'finance.next' | translate }}</button></div>
+        @if (evidence(); as file) { <s2s-document-viewer [file]="file" /> }
+        <s2s-reason-dialog [(visible)]="reasonVisible" headerKey="jobFinance.decisionReason"
+          confirmKey="common.confirm" [saving]="busy()" (confirmed)="onReasonConfirmed($event)" />
+      </section>
+    }
+    @case ('extraHours') {
+      <section class="s2s-panel">
+        <div class="head"><h2>{{ 'jobFinance.extra.title' | translate }}</h2>
+          <a [routerLink]="['/jobs', jobId(), 'movements']">{{ 'jobFinance.extra.movements' | translate }}</a></div>
+        <p class="muted">{{ 'jobFinance.extra.hint' | translate }}</p>
+        @if (current.clock; as c) {
+          @if (c.exceeded) { <ul class="warnings" role="alert"><li>{{ 'jobFinance.extra.exceeded' | translate: { hours: c.clock.basisHours } }}</li></ul> }
+          @if (c.notice; as notice) {
+            <p role="status">{{ 'jobFinance.extra.notice' | translate }}: <strong>{{ ('jobFinance.extra.noticeStatus.' + (notice.deliveryOutcome ? 'DELIVERED' : notice.status)) | translate }}</strong>
+              · <a [routerLink]="['/jobs', jobId(), 'movements']">{{ 'jobFinance.extra.noticeAction' | translate }}</a></p>
+          }
+          <dl class="summary-figures">
+            <div><dt>{{ 'jobFinance.extra.start' | translate }}</dt><dd>{{ (c.clock.startAt | utcDateTime) || '—' }}</dd></div>
+            <div><dt>{{ 'jobFinance.extra.stop' | translate }}</dt><dd>{{ (c.clock.stopAt | utcDateTime) || '—' }}</dd></div>
+            <div><dt>{{ 'jobFinance.extra.basis' | translate }}</dt><dd>{{ 'jobFinance.extra.hours' | translate: { hours: c.clock.basisHours } }}</dd></div>
+            <div><dt>{{ 'jobFinance.extra.elapsed' | translate }}</dt><dd>{{ c.clock.elapsedHours ?? '—' }}</dd></div>
+            <div><dt>{{ 'jobFinance.extra.extra' | translate }}</dt><dd>{{ c.clock.extraHours ?? '—' }}</dd></div>
+            <div><dt>{{ 'jobFinance.extra.billable' | translate }}</dt><dd>{{ c.clock.billableExtraUnits ?? '—' }}</dd></div>
+            <div><dt>{{ 'jobFinance.extra.charge' | translate }}</dt><dd>@if (c.clock.additionalCharge !== null) { {{ c.clock.currency }} {{ c.clock.additionalCharge }} } @else { — }</dd></div>
+            <div><dt>{{ 'jobFinance.extra.terms' | translate }}</dt><dd><s2s-status-tag [status]="c.clock.tariffTermsStatus" /></dd></div>
+          </dl>
+          <p class="muted">{{ (c.clock.tariffTermsStatus !== 'CONFIRMED' ? 'jobFinance.extra.pendingTerms' : c.clock.final ? 'jobFinance.extra.final' : 'jobFinance.extra.running') | translate }}</p>
+          @if (canInvoice()) {
+            <div class="actions">
+              <label>{{ 'finance.extraCostHead' | translate }}<select name="extraCostHead" [(ngModel)]="extraCostHead"><option value="">{{ 'common.select' | translate }}</option>
+                @for (head of revenueHeads(); track head.code) { <option [value]="head.code">{{ head.name }}</option> }</select></label>
+              <button type="button" [disabled]="busy() || !extraCostHead || !c.clock.final || c.clock.tariffTermsStatus !== 'CONFIRMED'" (click)="invoiceExtraHours()">{{ 'finance.fromClock' | translate }}</button>
+            </div>
+          }
+        } @else {
+          <p>{{ 'jobFinance.extra.none' | translate }}</p>
+        }
+      </section>
+    }
+    @case ('invoices') {
+      <s2s-job-invoices [jobId]="jobId()" />
+    }
+    @case ('fda') {
+      <section class="s2s-panel">
+        <h2>{{ 'jobFinance.fda' | translate }}</h2>
+        @if (current.preview; as preview) {
+          <p class="muted">{{ 'jobFinance.liveFda' | translate }}</p>
+          <dl class="summary-figures">
+            <div><dt>{{ 'jobFinance.income' | translate }}</dt><dd>{{ current.summary?.currency }} {{ preview.snapshot.income }}</dd></div>
+            <div><dt>{{ 'jobFinance.expenses' | translate }}</dt><dd>{{ current.summary?.currency }} {{ preview.snapshot.expenses }}</dd></div>
+            <div><dt>{{ 'jobFinance.issuedInvoices' | translate }}</dt><dd>{{ issuedInvoices(preview) }}</dd></div>
+            <div><dt>{{ 'jobFinance.approvedBills' | translate }}</dt><dd>{{ preview.snapshot.bills.length }}</dd></div>
+          </dl>
+          <p class="muted">{{ 'jobFinance.onAccount' | translate: { amount: preview.clientOnAccount, currency: current.summary?.currency } }}</p>
+        }
+        <div class="top-bar fda-top-bar">
+          @if (canWriteFda()) {
+            <button type="button" class="btn-primary-action" [disabled]="busy() || loadingSections().includes('fda') || loadErrors().includes('fda')" (click)="createFda()">
+              <i class="pi pi-plus" aria-hidden="true"></i> {{ 'jobFinance.newFda' | translate }}
+            </button>
+          }
+          @if (current.fda.length) {
+            <div class="fda-revisions-bar">
+              @for (revision of current.fda; track revision.id) {
+                <button type="button" class="btn-revision-chip" [class.active]="selectedFda()?.id === revision.id" (click)="selectFda(revision)">
+                  <i class="pi pi-history" aria-hidden="true"></i> {{ 'jobFinance.revision' | translate }} {{ revision.revisionNo }} · {{ revision.status }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+        @if (selectedFda(); as fda) {
+          <article class="s2s-panel fda-card">
+            <div class="card-header fda-card-header">
+              <div class="card-title fda-title-wrap">
+                <h3>{{ fda.number || ('jobFinance.draftFda' | translate) }}</h3>
+                <s2s-status-tag [status]="fda.status" />
+              </div>
+              <a class="btn-pdf-link" [href]="url('fda/' + fda.id + '/pdf')" target="_blank" rel="noopener">
+                <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ 'jobFinance.pdf' | translate }}
+              </a>
+            </div>
+
+            @if (fda.status === 'SUBMITTED') {
+              @if (fda.submittedBy === actor()) {
+                <p class="feedback info" role="status"><i class="pi pi-info-circle" aria-hidden="true"></i> {{ 'jobFinance.fdaSubmittedByYou' | translate }}</p>
+              } @else if (!canApproveFda()) {
+                <p class="feedback info" role="status"><i class="pi pi-info-circle" aria-hidden="true"></i> {{ 'jobFinance.fdaAwaitingApproval' | translate }}</p>
+              }
+            }
+            @if (fda.reason) { <p class="cost-decision-quote"><i class="pi pi-comment" aria-hidden="true"></i> {{ fda.reason }}</p> }
+
+            @if (snapshot(); as totals) {
+              <dl class="summary-figures fda-totals-grid">
+                <div><dt>{{ 'jobFinance.income' | translate }}</dt><dd>{{ totals.income }}</dd></div>
+                <div><dt>{{ 'jobFinance.expenses' | translate }}</dt><dd>{{ totals.expenses }}</dd></div>
+                <div><dt>{{ 'jobFinance.received' | translate }}</dt><dd>{{ totals.received }}</dd></div>
+                <div><dt>{{ 'jobFinance.outstanding' | translate }}</dt><dd>{{ totals.outstanding }}</dd></div>
+                <div><dt>{{ 'jobFinance.margin' | translate }}</dt><dd class="fda-margin-val">{{ totals.margin }}</dd></div>
+              </dl>
+            }
+
+            <form (ngSubmit)="saveFda()" class="fda-form">
+              <fieldset [disabled]="fda.status !== 'DRAFT' || !canWriteFda()">
+                <label>{{ 'jobFinance.reconciliation' | translate }}<textarea name="reconciliation" [(ngModel)]="fdaInput.reconciliationNote" maxlength="2000"></textarea></label>
+                <label>{{ 'jobFinance.noExternalCosts' | translate }}<textarea name="noCosts" [(ngModel)]="fdaInput.noExternalCostsReason" maxlength="1000"></textarea></label>
+                <label>{{ 'jobFinance.extraHoursNote' | translate }}<textarea name="extraHoursNote" [(ngModel)]="fdaInput.extraHoursNote" maxlength="1000"></textarea></label>
+                <details><summary>{{ 'common.moreDetails' | translate }}</summary>
+                  <label>{{ 'jobFinance.notes' | translate }}<textarea name="fdaNotes" [(ngModel)]="fdaInput.notes" maxlength="4000"></textarea></label>
+                </details>
+                @for (adjustment of fdaInput.adjustments; track $index; let index = $index) {
+                  <fieldset><legend>{{ 'jobFinance.adjustment' | translate }} {{ index + 1 }}</legend>
+                    <label>{{ 'jobFinance.type' | translate }}<select [name]="'adjustment-kind-' + index" [(ngModel)]="adjustment.kind"><option value="EXPENSE">{{ 'jobFinance.expenses' | translate }}</option><option value="INCOME">{{ 'jobFinance.income' | translate }}</option></select></label>
+                    <label>{{ 'jobFinance.description' | translate }}<input [name]="'adjustment-description-' + index" [(ngModel)]="adjustment.description" required maxlength="300" /></label>
+                    <label>{{ 'jobFinance.jobAmount' | translate }}<input [name]="'adjustment-amount-' + index" [(ngModel)]="adjustment.amount" inputmode="decimal" required /></label>
+                    <label>{{ 'jobFinance.evidence' | translate }}<input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="uploadAdjustment($event, index)" />{{ adjustment.fileId }}</label>
+                    <button type="button" (click)="fdaInput.adjustments.splice(index, 1)">{{ 'common.remove' | translate }}</button>
+                  </fieldset>
+                }
+                <button type="button" class="btn-secondary" (click)="addAdjustment()">
+                  <i class="pi pi-plus" aria-hidden="true"></i> {{ 'jobFinance.addAdjustment' | translate }}
+                </button>
+                @if (fda.status === 'DRAFT' && canWriteFda()) {
+                  <button type="submit" class="btn-save-fda" [disabled]="busy()">
+                    <i class="pi pi-check" aria-hidden="true"></i> {{ 'common.save' | translate }}
+                  </button>
+                }
+              </fieldset>
+            </form>
+
+            <div class="actions card-actions fda-card-actions">
+              @if (fda.status === 'DRAFT' && canWriteFda()) {
+                <button type="button" class="btn-submit-action" [disabled]="busy()" (click)="fdaAction('SUBMIT')">
+                  <i class="pi pi-send" aria-hidden="true"></i> {{ 'jobFinance.submit' | translate }}
+                </button>
+              }
+              @if (fda.status === 'SUBMITTED' && canApproveFda() && fda.submittedBy !== actor()) {
+                <button type="button" class="btn-approve-action" [disabled]="busy()" (click)="fdaAction('APPROVE')">
+                  <i class="pi pi-check" aria-hidden="true"></i> {{ 'jobFinance.approve' | translate }}
+                </button>
+              }
+              @if ((fda.status === 'SUBMITTED' || fda.status === 'APPROVED') && canApproveFda() && fda.submittedBy !== actor()) {
+                <button type="button" [disabled]="busy()" (click)="openFdaReasonAction('RETURN')">
+                  <i class="pi pi-undo" aria-hidden="true"></i> {{ 'jobFinance.return' | translate }}
+                </button>
+              }
+              @if (fda.status === 'APPROVED' && canWriteFda()) {
+                <button type="button" class="btn-primary-action" [disabled]="busy()" (click)="fdaAction('ISSUE')">
+                  <i class="pi pi-file-export" aria-hidden="true"></i> {{ 'jobFinance.issue' | translate }}
+                </button>
+              }
+            </div>
+          </article>
+        }
+        <s2s-reason-dialog [(visible)]="reasonVisible" headerKey="jobFinance.decisionReason"
+          confirmKey="common.confirm" [saving]="busy()" (confirmed)="onReasonConfirmed($event)" />
+      </section>
+    }
+  }
+}

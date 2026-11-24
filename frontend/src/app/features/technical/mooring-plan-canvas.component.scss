@@ -1,0 +1,17 @@
+:host { display: block; min-width: 0; }
+.canvas-toolbar { display: flex; gap: .5rem; margin-bottom: .5rem; }
+button { min-width: 44px; min-height: 44px; border: 1px solid var(--s2s-border); border-radius: .5rem; background: var(--s2s-surface); cursor: pointer; }
+svg { display: block; width: 100%; min-height: 260px; max-height: 520px; border: 1px solid var(--s2s-border); border-radius: .5rem; background: #f9fbfc; touch-action: none; }
+.manifold { stroke: #aab7c1; stroke-dasharray: 2 2; }
+.vessel { fill: #d8e8ef; stroke: #164861; stroke-width: .7; }
+.mooring-line { stroke: #a1422b; stroke-width: .9; }
+.symbol { cursor: grab; stroke-width: .7; }
+.fender { fill: #e1a52f; stroke: #63450e; }
+.craft { fill: #91b9d8; stroke: #17496f; }
+.mooring { fill: #c97250; stroke: #713522; }
+.point { fill: #bd6640; }
+.annotation { font-size: 5px; fill: #173b50; cursor: grab; }
+.selection { fill: none; stroke: #142c42; stroke-width: 1.2; }
+.caption { font-size: 4px; fill: #173b50; }
+.ruler { stroke: #253f50; stroke-width: .6; }
+.tick { font-size: 3px; text-anchor: middle; }

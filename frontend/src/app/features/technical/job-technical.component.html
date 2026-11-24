@@ -1,0 +1,290 @@
+<header class="technical-header">
+  <a [routerLink]="['/jobs', jobId()]">← {{ job()?.jobNumber ?? 'Job' }}</a>
+  @if (canManageTemplates()) { <a routerLink="/technical/templates">{{ 'jobDocuments.templates' | translate }}</a> }
+  <h1>{{ 'jobDocuments.title' | translate }}</h1>
+  <p>{{ 'jobDocuments.intro' | translate }}</p>
+</header>
+
+@if (error(); as message) { <p class="feedback error" role="alert">{{ message }} <button type="button" (click)="reload()">Reload</button></p> }
+@if (notice(); as message) { <p class="feedback" role="status">{{ message }}</p> }
+
+<div class="readiness-banner" [class.ready]="readiness().isReady">
+  <div class="banner-status">
+    <span class="status-icon">{{ readiness().isReady ? '✓' : '⏳' }}</span>
+    <div>
+      <strong>{{ (readiness().isReady ? 'jobDocuments.ready' : 'jobDocuments.inProgress') | translate }}</strong>
+      <p>{{ readiness().summary }}</p>
+    </div>
+  </div>
+  <div class="banner-stats">
+    <button type="button" class="stat-pill" [class.selected]="selectedPhase() === 'PRE_ARRIVAL'" (click)="selectedPhase.set('PRE_ARRIVAL')">
+      <span class="stat-num">{{ phaseCounts().PRE_ARRIVAL.received }}/{{ phaseCounts().PRE_ARRIVAL.total }}</span>
+      <span class="stat-lbl">{{ 'jobDocuments.beforeShort' | translate }}</span>
+    </button>
+    <button type="button" class="stat-pill" [class.selected]="selectedPhase() === 'ON_ARRIVAL'" (click)="selectedPhase.set('ON_ARRIVAL')">
+      <span class="stat-num">{{ phaseCounts().ON_ARRIVAL.received }}/{{ phaseCounts().ON_ARRIVAL.total }}</span>
+      <span class="stat-lbl">{{ 'jobDocuments.duringShort' | translate }}</span>
+    </button>
+    <button type="button" class="stat-pill" [class.selected]="selectedPhase() === 'POST_DEPARTURE'" (click)="selectedPhase.set('POST_DEPARTURE')">
+      <span class="stat-num">{{ phaseCounts().POST_DEPARTURE.received }}/{{ phaseCounts().POST_DEPARTURE.total }}</span>
+      <span class="stat-lbl">{{ 'jobDocuments.afterShort' | translate }}</span>
+    </button>
+  </div>
+</div>
+
+<section class="s2s-panel" aria-labelledby="request-title">
+  <div class="section-heading">
+    <h2 id="request-title">{{ 'jobDocuments.phases' | translate }}</h2>
+    <div class="phase-tabs" role="group" [attr.aria-label]="'jobDocuments.phases' | translate">
+      <button type="button" class="phase-tab" [class.active]="selectedPhase() === 'PRE_ARRIVAL'"
+        [attr.aria-pressed]="selectedPhase() === 'PRE_ARRIVAL'" (click)="selectedPhase.set('PRE_ARRIVAL')">
+        {{ 'jobDocuments.before' | translate }}
+        <span class="tab-badge" [class.done]="phaseCounts().PRE_ARRIVAL.received === phaseCounts().PRE_ARRIVAL.total && phaseCounts().PRE_ARRIVAL.total > 0">
+          {{ phaseCounts().PRE_ARRIVAL.received }}/{{ phaseCounts().PRE_ARRIVAL.total }}
+        </span>
+      </button>
+      <button type="button" class="phase-tab" [class.active]="selectedPhase() === 'ON_ARRIVAL'"
+        [attr.aria-pressed]="selectedPhase() === 'ON_ARRIVAL'" (click)="selectedPhase.set('ON_ARRIVAL')">
+        {{ 'jobDocuments.during' | translate }}
+        <span class="tab-badge" [class.done]="phaseCounts().ON_ARRIVAL.received === phaseCounts().ON_ARRIVAL.total && phaseCounts().ON_ARRIVAL.total > 0">
+          {{ phaseCounts().ON_ARRIVAL.received }}/{{ phaseCounts().ON_ARRIVAL.total }}
+        </span>
+      </button>
+      <button type="button" class="phase-tab" [class.active]="selectedPhase() === 'POST_DEPARTURE'"
+        [attr.aria-pressed]="selectedPhase() === 'POST_DEPARTURE'" (click)="selectedPhase.set('POST_DEPARTURE')">
+        {{ 'jobDocuments.after' | translate }}
+        <span class="tab-badge" [class.done]="phaseCounts().POST_DEPARTURE.received === phaseCounts().POST_DEPARTURE.total && phaseCounts().POST_DEPARTURE.total > 0">
+          {{ phaseCounts().POST_DEPARTURE.received }}/{{ phaseCounts().POST_DEPARTURE.total }}
+        </span>
+      </button>
+    </div>
+  </div>
+
+  @if (request()?.status === 'PENDING_TEMPLATE') {
+    <p>{{ 'jobDocuments.pendingTemplate' | translate }}</p>
+    @if (canWrite()) { <button type="button" [disabled]="busy()" (click)="startRequest()">{{ 'jobDocuments.createFromTemplate' | translate }}</button> }
+  } @else {
+    <div class="tick-grid" role="table" aria-label="Documents received from each vessel">
+      <div class="tick-row head" role="row">
+        <span role="columnheader">Document / Checklist</span>
+        @for (vessel of gridColumns(); track vessel.id) { <span role="columnheader">{{ vessel.label }}</span> }
+      </div>
+      @for (row of gridRows(); track row.code) {
+        <div class="tick-row" role="row">
+          <span role="rowheader">{{ row.label }}</span>
+          @for (vessel of gridColumns(); track vessel.id) {
+            <span role="cell" class="cell">
+              @if (row.cells[vessel.id]; as item) {
+                @if (item.kind === 'DECLARATION' && item.code === 'REDUCER') {
+                  <select [attr.aria-label]="row.label + ' · ' + vessel.label" [value]="item.responseText ?? ''"
+                    [disabled]="!canWrite() || busy()" (change)="setItem(item, 'RECEIVED', $any($event.target).value)">
+                    <option value="" disabled>Choose</option><option value="Available">Available</option><option value="Not available">Not available</option>
+                  </select>
+                } @else if (item.kind === 'CONTACT' || item.kind === 'DECLARATION') {
+                  <input type="text" [attr.aria-label]="row.label + ' · ' + vessel.label" [value]="item.responseText ?? ''" maxlength="1000"
+                    placeholder="Type and press Enter" [disabled]="!canWrite() || busy()"
+                    (keydown.enter)="setItem(item, 'RECEIVED', $any($event.target).value)" (blur)="saveText(item, $any($event.target).value)" />
+                } @else if (item.kind === 'DOCUMENT' || item.kind === 'CHECKLIST') {
+                  <div class="doc-cell">
+                    <label class="tick">
+                      <input type="checkbox" [checked]="received(item)" [disabled]="!canWrite() || busy()"
+                        (change)="setItem(item, $any($event.target).checked ? 'RECEIVED' : 'PENDING')" />
+                      <span class="sr-only">{{ row.label }} · {{ vessel.label }}</span>
+                      @if (item.status === 'REVIEWED') { <span class="ok">Checked</span> }
+                    </label>
+                    @if (canWrite()) {
+                      <label class="upload-inline item">
+                        <span class="upload-btn">{{ itemDocs(item).length ? 'Replace' : 'Upload' }}</span>
+                        <input type="file" accept="application/pdf,image/png,image/jpeg" [disabled]="busy()" (change)="upload(item, $event)" />
+                      </label>
+                    }
+                    @for (doc of itemDocs(item); track doc.id) {
+                      <button type="button" class="doc-chip" (click)="showDocument(doc)">{{ doc.fileName }}</button>
+                    }
+                  </div>
+                } @else {
+                  <label class="tick">
+                    <input type="checkbox" [checked]="received(item)" [disabled]="!canWrite() || busy()"
+                      (change)="setItem(item, $any($event.target).checked ? 'RECEIVED' : 'PENDING')" />
+                    <span class="sr-only">{{ row.label }} · {{ vessel.label }}</span>
+                    @if (item.status === 'REVIEWED') { <span class="ok">Checked</span> }
+                  </label>
+                }
+                @if (canReview() && item.status === 'RECEIVED') {
+                  <button type="button" class="review-item" [disabled]="busy()"
+                    [attr.aria-label]="'Review ' + row.label + ' · ' + vessel.label"
+                    (click)="setItem(item, 'REVIEWED')">Review</button>
+                }
+              } @else { <span class="s2s-muted" aria-label="Not requested">—</span> }
+            </span>
+          }
+        </div>
+      }
+    </div>
+    <p class="s2s-muted count">{{ phaseCounts()[selectedPhase()].received }} of {{ phaseCounts()[selectedPhase()].total }} received for this phase ({{ receivedCount() }} of {{ activeItems().length }} overall)</p>
+    @if (canWrite()) {
+      <details class="item advanced">
+        <summary>Add an extra request item</summary>
+        <div class="create-row">
+          <label>Code <input [ngModel]="extraItem().code" (ngModelChange)="setExtra('code', $event)" maxlength="40" /></label>
+          <label>Label <input [ngModel]="extraItem().label" (ngModelChange)="setExtra('label', $event)" maxlength="200" /></label>
+          <label>Phase <select [ngModel]="extraItem().phase" (ngModelChange)="setExtra('phase', $event)">
+            <option value="PRE_ARRIVAL">Before Arrival</option>
+            <option value="ON_ARRIVAL">On Arrival & Transfer</option>
+            <option value="POST_DEPARTURE">After Departure</option>
+          </select></label>
+          <label>Kind <select [ngModel]="extraItem().kind" (ngModelChange)="setExtra('kind', $event)">
+            <option value="DOCUMENT">Document</option><option value="DECLARATION">Declaration</option>
+            <option value="CONTACT">Contact</option><option value="VOYAGE_DATA">Voyage values</option>
+            <option value="CHECKLIST">Checklist</option></select></label>
+          <label>Vessel <select [ngModel]="extraItem().jobVesselId" (ngModelChange)="setExtra('jobVesselId', $event)">
+            <option value="">Whole job</option>
+            @for (vessel of job()?.vessels ?? []; track vessel.id) { <option [value]="vessel.id">{{ vesselName(vessel.id) }}</option> }
+          </select></label>
+          @if (extraItem().kind === 'DOCUMENT') {
+            <label>Document type <select [ngModel]="extraItem().documentTypeId" (ngModelChange)="setExtra('documentTypeId', $event)">
+              <option value="">Select</option>
+              @for (type of documentTypes(); track type.value) {
+                @if (type.meta?.['appliesTo'] === (extraItem().jobVesselId ? 'VESSEL' : 'JOB')) {
+                  <option [value]="type.value">{{ type.label }}</option>
+                }
+              }
+            </select></label>
+          }
+          <label>Reason <input [ngModel]="extraItem().reason" (ngModelChange)="setExtra('reason', $event)" maxlength="500" /></label>
+          <button type="button" [disabled]="busy() || !extraItem().code || !extraItem().label || !extraItem().reason"
+            (click)="addItem()">Add item</button>
+        </div>
+      </details>
+    }
+    <details class="item advanced"><summary>Email to owners</summary>
+      <div class="actions"><button type="button" (click)="previewEmail()">Preview request email</button></div>
+      @if (email(); as draft) {
+        <div class="email-draft">
+          @if (draft.unresolved.length) { <p class="feedback">Pending placeholders: {{ draft.unresolved.join(', ') }}</p> }
+          <label>Subject <input type="text" [ngModel]="emailSubject()" (ngModelChange)="emailSubject.set($event)" /></label>
+          <label>Body <textarea rows="10" [ngModel]="emailBody()" (ngModelChange)="emailBody.set($event)"></textarea></label>
+          <button type="button" (click)="copyEmail()">Copy email text</button>
+          <p class="muted">Send from your mail app. Copying does not record delivery.</p>
+        </div>
+      }
+    </details>
+  }
+</section>
+
+<section class="s2s-panel" aria-labelledby="documents-title">
+  <h2 id="documents-title">Collected documents</h2>
+  @if (!documents().length) { <p>No job documents have been uploaded.</p> }
+  <div class="document-list">
+    @for (doc of documents(); track doc.id) {
+      <button type="button" (click)="showDocument(doc)">
+        {{ vesselName(doc.jobVesselId) }} · {{ doc.fileName }} · v{{ doc.versionNo }}
+        <span class="state">{{ doc.scanState }}</span>
+      </button>
+    }
+  </div>
+  @if (viewing()) { <s2s-document-viewer [file]="viewing()" /> }
+</section>
+
+<details class="s2s-panel" aria-labelledby="checklists-title">
+  <summary id="checklists-title">After the operation · signed checklists</summary>
+  @if (!templates().length) { <p>Checklist names and questions are pending configuration.</p> }
+  @if (canWrite() && templates().length) {
+    <div class="create-row">
+      <label>Template
+        <select [ngModel]="selectedTemplate()" (ngModelChange)="selectedTemplate.set($event)">
+          <option value="">Select checklist</option>
+          @for (template of templates(); track template.id) { <option [value]="template.id">{{ template.name }} v{{ template.versionNo }}</option> }
+        </select>
+      </label>
+      <label>Vessel
+        <select [ngModel]="selectedChecklistVessel()" (ngModelChange)="selectedChecklistVessel.set($event)">
+          <option value="">Whole job</option>
+          @for (vessel of job()?.vessels ?? []; track vessel.id) { <option [value]="vessel.id">{{ vesselName(vessel.id) }}</option> }
+        </select>
+      </label>
+      <button type="button" [disabled]="busy() || !selectedTemplate()" (click)="createChecklist()">Start checklist</button>
+    </div>
+  }
+  @for (response of checklists(); track response.id) {
+    <article class="item">
+      <div class="item-heading"><strong>{{ response.template.name }} v{{ response.template.versionNo }}</strong>
+        <span>{{ vesselName(response.jobVesselId) }}</span><span class="state">{{ response.status }}</span></div>
+      @for (question of response.template.items; track question.code) {
+        <div class="question"><span>{{ question.label }} @if (question.required) { <span aria-hidden="true">*</span> }</span>
+          @if (question.answerType === 'YES_NO') {
+            <select [attr.aria-label]="question.label" [ngModel]="checklistAnswers()[response.id]?.[question.code] ?? ''"
+              (ngModelChange)="changeAnswer(response.id, question.code, $event)" [disabled]="!canWrite()">
+              <option value="">Select</option><option value="YES">Yes</option><option value="NO">No</option>
+            </select>
+          } @else {
+            <input [attr.aria-label]="question.label" [type]="question.answerType === 'DATE' ? 'date' : question.answerType === 'NUMBER' ? 'number' : 'text'"
+              [ngModel]="checklistAnswers()[response.id]?.[question.code] ?? ''"
+              (ngModelChange)="changeAnswer(response.id, question.code, $event)" [disabled]="!canWrite()" />
+          }
+        </div>
+      }
+      <label>Signed document
+        <select [ngModel]="checklistSigned()[response.id]" (ngModelChange)="changeSigned(response.id, $event)" [disabled]="!canWrite()">
+          <option value="">Pending</option>
+          @for (doc of docsFor(response.jobVesselId); track doc.id) {
+            <option [value]="doc.id">{{ doc.fileName }} v{{ doc.versionNo }}</option>
+          }
+        </select>
+      </label>
+      @if (canWrite()) { <div class="actions"><button type="button" [disabled]="busy()" (click)="saveChecklist(response, 'DRAFT')">Save draft</button>
+        <button type="button" [disabled]="busy()" (click)="saveChecklist(response, 'RECORDED')">Record response</button></div> }
+    </article>
+  }
+</details>
+
+<section class="s2s-panel" aria-labelledby="voyage-title">
+  <h2 id="voyage-title">Voyage-condition values · before JPO</h2>
+  <p class="muted">Taken automatically from each vessel's uploaded documents for the JPO. Adjust any value if needed.</p>
+  @for (vessel of job()?.vessels ?? []; track vessel.id) {
+    <article class="vessel-card">
+      <div class="item-heading">
+        <h3>{{ vesselName(vessel.id) }}</h3>
+        @if (primaryDoc(vessel.id); as doc) {
+          <span class="evidence">Source: {{ doc.fileName }} · v{{ doc.versionNo }}</span>
+        }
+        @if (latestVoyage(vessel.id); as version) {
+          <span class="state">{{ version.status }}</span>
+        }
+        @if (canWrite() && docsFor(vessel.id).length) {
+          <button type="button" [disabled]="busy()" (click)="populateFromDoc(vessel.id)">Take from uploaded document</button>
+        }
+      </div>
+      @if (latestVoyage(vessel.id) || docsFor(vessel.id).length) {
+        <div class="voyage-grid">
+          @for (field of fields(); track field.code) {
+            <div class="voyage-field">
+              <label>{{ field.label }} ({{ field.unit }})
+                <input type="number" step="0.001" min="0" [attr.aria-label]="field.label"
+                  [ngModel]="vesselValue(vessel.id, field.code)"
+                  (ngModelChange)="changeVesselValue(vessel.id, field.code, $event)"
+                  [disabled]="!canWrite()" />
+              </label>
+            </div>
+          }
+        </div>
+        @if (canWrite()) {
+          <div class="actions">
+            <button type="button" [disabled]="busy()" (click)="saveFromDoc(vessel.id)">Save values</button>
+          </div>
+        }
+      } @else {
+        <p class="muted">Upload a document for this vessel above (such as Q88 or Ship particulars) to populate JPO values automatically.</p>
+      }
+    </article>
+  }
+</section>
+
+@if (review()?.warnings?.length) {
+  <details class="s2s-panel" open>
+    <summary><strong>Things to check before the JPO ({{ review()!.warnings.length }})</strong></summary>
+    <ul>@for (warning of review()!.warnings; track $index) {
+      <li>@if (warning.vesselRole) { {{ warning.vesselRole === 'MOTHER' ? 'Mother' : 'Daughter' }}: }{{ warning.message }}</li>
+    }</ul>
+  </details>
+}

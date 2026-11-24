@@ -1,0 +1,46 @@
+<s2s-page-header [heading]="'nav.enquiries' | translate" [subtitle]="'enquiry.subtitle' | translate">
+  <a class="p-button p-button-outlined link-button" [href]="xlsxUrl()" download>
+    <i class="pi pi-file-excel" aria-hidden="true"></i> {{ 'enquiry.exportExcel' | translate }}
+  </a>
+  <p-button *s2sCan="permissions.enquiryWrite" [label]="'enquiry.new' | translate" icon="pi pi-plus" routerLink="new" />
+</s2s-page-header>
+
+@if (drafts().length) {
+  <section class="s2s-panel">
+    <h2>{{ 'enquiry.draft' | translate }}</h2>
+    @for (draft of drafts(); track draft.id) {
+      <p><a [routerLink]="['drafts', draft.id]">{{ draft.data.clientLabel || draft.data.sourceReference || ('enquiry.draft' | translate) }}</a>
+        · {{ draft.updatedAt | date:'medium' }}</p>
+    }
+  </section>
+}
+
+<section class="s2s-panel">
+  <s2s-data-table
+    [columns]="columns"
+    [load]="load"
+    [params]="params()"
+    [actions]="actions"
+    defaultSort="receivedAt,desc"
+    captionKey="nav.enquiries"
+    emptyKey="enquiry.empty">
+    <p-select
+      tableToolbar
+      [options]="statusOptions()"
+      optionLabel="label"
+      optionValue="value"
+      [showClear]="true"
+      [placeholder]="'filters.allStatuses' | translate"
+      [ariaLabel]="'filters.status' | translate"
+      [ngModel]="status()"
+      (ngModelChange)="status.set($event ?? null)" />
+    <p-select tableToolbar [options]="branches()" optionLabel="label" optionValue="value" [showClear]="true"
+      [placeholder]="'enquiry.branch' | translate" [ngModel]="branchId()" (ngModelChange)="branchId.set($event ?? null)" />
+    <label tableToolbar for="enquiry-from">{{ 'enquiry.receivedAt' | translate }} {{ 'reports.from' | translate }}</label>
+    <input pInputText tableToolbar id="enquiry-from" type="date" [ngModel]="receivedFrom()"
+      (ngModelChange)="receivedFrom.set($event || null)" />
+    <label tableToolbar for="enquiry-to">{{ 'enquiry.receivedAt' | translate }} {{ 'reports.to' | translate }}</label>
+    <input pInputText tableToolbar id="enquiry-to" type="date" [ngModel]="receivedTo()"
+      (ngModelChange)="receivedTo.set($event || null)" />
+  </s2s-data-table>
+</section>

@@ -1,0 +1,34 @@
+<s2s-page-header [heading]="'users.myProfile' | translate" />
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" class="form-message">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="load()" />
+    }
+  </p-message>
+}
+
+<form class="s2s-panel" [formGroup]="form" (ngSubmit)="save()" novalidate [attr.aria-busy]="loading()">
+  <h2 class="section-title">{{ 'users.account' | translate }}</h2>
+  <div class="s2s-form-grid">
+    <s2s-form-field labelKey="users.username" fieldId="profileUsername" [control]="form.controls.username" [required]="true" hintKey="users.usernameHint">
+      <input pInputText id="profileUsername" formControlName="username" maxlength="128" autocomplete="username" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.fullName" fieldId="profileFullName" [control]="form.controls.fullName">
+      <input pInputText id="profileFullName" formControlName="fullName" maxlength="150" autocomplete="name" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.workEmail" fieldId="profileWorkEmail" [control]="form.controls.workEmail">
+      <input pInputText id="profileWorkEmail" type="email" formControlName="workEmail" maxlength="254" autocomplete="email" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.department" fieldId="profileDepartment" [control]="form.controls.department">
+      <input pInputText id="profileDepartment" formControlName="department" maxlength="80" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.position" fieldId="profilePosition" [control]="form.controls.position">
+      <input pInputText id="profilePosition" formControlName="position" maxlength="80" />
+    </s2s-form-field>
+  </div>
+  <div class="s2s-actions">
+    <p-button type="submit" [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" [disabled]="loading()" />
+  </div>
+</form>

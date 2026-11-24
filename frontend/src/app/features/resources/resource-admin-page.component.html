@@ -1,0 +1,158 @@
+<s2s-page-header [heading]="'resources.admin.' + mode() | translate" [subtitle]="'resources.adminSubtitle' | translate" />
+@if (errorKey(); as error) { <p-message severity="error" role="alert" [text]="error | translate" /> }
+@if (saved()) { <p-message severity="success" [text]="'resources.saved' | translate" /> }
+  @if (mode() === 'equipment') {
+    <section class="s2s-panel">
+      <h2>{{ 'resources.models' | translate }}</h2>
+      <s2s-data-table #modelTable [columns]="modelColumns" [load]="loadModels" [actions]="modelActions" [params]="tableParams()" />
+      @if (canWrite) { <form [formGroup]="modelForm" (ngSubmit)="saveModel()" class="fields">
+        <label>{{ 'resources.category' | translate }}<select formControlName="categoryCode"><option value=""></option>
+          @for (row of categories(); track row.code) { <option [value]="row.code">{{ row.label }}</option> }</select><s2s-form-errors [control]="modelForm.controls.categoryCode" /></label>
+        <label>{{ 'resources.code' | translate }}<input formControlName="code" required /><s2s-form-errors [control]="modelForm.controls.code" /></label>
+        <label>{{ 'resources.name' | translate }}<input formControlName="name" required /><s2s-form-errors [control]="modelForm.controls.name" /></label>
+        <label>{{ 'resources.standardRate' | translate }}<input type="number" min="0" step="0.0001" formControlName="standardRate" /><s2s-form-errors [control]="modelForm.controls.standardRate" /></label>
+        <label>{{ 'resources.standardRateCurrency' | translate }}<select formControlName="standardRateCurrency"><option value=""></option>
+          @for (row of currencies(); track row.value) { <option [value]="row.value">{{ row.label }}</option> }</select><s2s-form-errors [control]="modelForm.controls.standardRateCurrency" /></label>
+        <label class="check"><input type="checkbox" formControlName="active" />{{ 'resources.active' | translate }}<s2s-form-errors [control]="modelForm.controls.active" /></label>
+        <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || modelForm.invalid" />
+      </form> }
+    </section>
+    <section class="s2s-panel">
+      <h2>{{ 'resources.assets' | translate }}</h2>
+      <s2s-data-table #assetTable [columns]="assetColumns" [load]="loadAssets" [actions]="assetActions" [params]="tableParams()" />
+      @if (canWrite) { <form [formGroup]="assetForm" (ngSubmit)="saveAsset()" class="fields">
+        <label>{{ 'table.search' | translate }} {{ 'resources.models' | translate }}<input [formControl]="modelSearch" /></label>
+        <label>{{ 'resources.model' | translate }}<select formControlName="modelId"><option value=""></option>
+          @for (row of models(); track row.id) { <option [value]="row.id">{{ row.name }}</option> }</select><s2s-form-errors [control]="assetForm.controls.modelId" /></label>
+        <label>{{ 'resources.assetId' | translate }}<input formControlName="assetIdentifier" required /><s2s-form-errors [control]="assetForm.controls.assetIdentifier" /></label>
+        <label>{{ 'resources.dimensions' | translate }}<input formControlName="dimensionsText" /><s2s-form-errors [control]="assetForm.controls.dimensionsText" /></label>
+        <label>{{ 'resources.homeLocation' | translate }}<input formControlName="homeLocation" /><s2s-form-errors [control]="assetForm.controls.homeLocation" /></label>
+        <label>{{ 'resources.status' | translate }}<select formControlName="status"><option value="AVAILABLE">{{ 'resources.available' | translate }}</option>
+          <option value="MAINTENANCE">{{ 'resources.maintenance' | translate }}</option><option value="DAMAGED">{{ 'resources.damaged' | translate }}</option>
+          <option value="LOST">{{ 'resources.lost' | translate }}</option><option value="RETIRED">{{ 'resources.retired' | translate }}</option></select><s2s-form-errors [control]="assetForm.controls.status" /></label>
+        <label>{{ 'resources.swlValue' | translate }}<input type="number" min="0" step="0.001" formControlName="swlValue" /><s2s-form-errors [control]="assetForm.controls.swlValue" /></label>
+        <label>{{ 'resources.swlUnit' | translate }}<input formControlName="swlUnit" /><s2s-form-errors [control]="assetForm.controls.swlUnit" /></label>
+        <label>{{ 'resources.swlSource' | translate }}<input formControlName="swlSource" /><s2s-form-errors [control]="assetForm.controls.swlSource" /></label>
+        <label>{{ 'resources.mblValue' | translate }}<input type="number" min="0" step="0.001" formControlName="mblValue" /><s2s-form-errors [control]="assetForm.controls.mblValue" /></label>
+        <label>{{ 'resources.mblUnit' | translate }}<input formControlName="mblUnit" /><s2s-form-errors [control]="assetForm.controls.mblUnit" /></label>
+        <label>{{ 'resources.mblSource' | translate }}<input formControlName="mblSource" /><s2s-form-errors [control]="assetForm.controls.mblSource" /></label>
+        <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || assetForm.invalid" />
+      </form> }
+    </section>
+  }
+
+  @if (mode() === 'personnel') {
+    <section class="s2s-panel"><h2>{{ 'resources.personnel' | translate }}</h2>
+      <s2s-data-table #personTable [columns]="personColumns" [load]="loadPeople" [actions]="personActions" [params]="tableParams()" />
+      @if (canWrite) { <form [formGroup]="personForm" (ngSubmit)="savePerson()" class="fields">
+        <label>{{ 'resources.personnelId' | translate }}<input formControlName="personnelIdentifier" required /><s2s-form-errors [control]="personForm.controls.personnelIdentifier" /></label>
+        <label>{{ 'resources.fullName' | translate }}<input formControlName="fullName" required /><s2s-form-errors [control]="personForm.controls.fullName" /></label>
+        <label>{{ 'resources.competency' | translate }}<input formControlName="competency" /><s2s-form-errors [control]="personForm.controls.competency" /></label>
+        <label>{{ 'resources.appUserId' | translate }}<input formControlName="appUserId" /><s2s-form-errors [control]="personForm.controls.appUserId" /></label>
+        <label>{{ 'resources.availabilityNote' | translate }}<input formControlName="availabilityNote" /><s2s-form-errors [control]="personForm.controls.availabilityNote" /></label>
+        <label class="check"><input type="checkbox" formControlName="active" />{{ 'resources.active' | translate }}<s2s-form-errors [control]="personForm.controls.active" /></label>
+        <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || personForm.invalid" />
+      </form> }
+    </section>
+  }
+
+  @if (mode() === 'equipment') {
+    <section class="s2s-panel"><h2>{{ 'resources.vendors' | translate }}</h2>
+      <s2s-data-table #vendorTable [columns]="vendorColumns" [load]="loadVendors" [actions]="vendorActions" [params]="tableParams()" />
+      @if (canWrite) { <form [formGroup]="vendorForm" (ngSubmit)="saveVendor()" class="fields">
+        <label>{{ 'resources.name' | translate }}<input formControlName="name" required /><s2s-form-errors [control]="vendorForm.controls.name" /></label>
+        <label>{{ 'resources.contacts' | translate }}<input formControlName="contacts" /><s2s-form-errors [control]="vendorForm.controls.contacts" /></label>
+        <label>{{ 'resources.contractFrom' | translate }}<input type="date" formControlName="contractFrom" /><s2s-form-errors [control]="vendorForm.controls.contractFrom" /></label>
+        <label>{{ 'resources.contractTo' | translate }}<input type="date" formControlName="contractTo" /><s2s-form-errors [control]="vendorForm.controls.contractTo" /></label>
+        <label class="check"><input type="checkbox" formControlName="active" />{{ 'resources.active' | translate }}<s2s-form-errors [control]="vendorForm.controls.active" /></label>
+        <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || vendorForm.invalid" />
+      </form> }
+    </section>
+  }
+
+  @if (selected(); as owner) {
+    <section class="s2s-panel"><h2>{{ 'resources.certificates' | translate }}</h2>
+      <div class="cards">@for (row of certificates(); track row.id) { <article class="card"><strong>{{ row.typeCode }} · {{ row.certificateNumber }}</strong>
+        <p>{{ 'resources.expiryDate' | translate }}: {{ row.expiryDate ?? '—' }} · {{ row.scanState ?? '—' }}</p>
+        @if (canWrite) { <p-button size="small" [label]="'common.edit' | translate" (onClick)="editCertificate(row)" /> }
+      </article> }</div>
+      @if (canWrite) { <form [formGroup]="certForm" (ngSubmit)="saveCertificate()" class="fields">
+        <label>{{ 'resources.certificateType' | translate }}<select formControlName="typeCode"><option value=""></option>
+          @for (row of certificateTypes(); track row.code) { <option [value]="row.code">{{ row.label }}</option> }</select><s2s-form-errors [control]="certForm.controls.typeCode" /></label>
+        <label>{{ 'resources.certificateNumber' | translate }}<input formControlName="certificateNumber" required /><s2s-form-errors [control]="certForm.controls.certificateNumber" /></label>
+        <label>{{ 'resources.issuer' | translate }}<input formControlName="issuer" required /><s2s-form-errors [control]="certForm.controls.issuer" /></label>
+        <label>{{ 'resources.issueDate' | translate }}<input type="date" formControlName="issueDate" required /><s2s-form-errors [control]="certForm.controls.issueDate" /></label>
+        <label>{{ 'resources.expiryDate' | translate }}<input type="date" formControlName="expiryDate" /><s2s-form-errors [control]="certForm.controls.expiryDate" /></label>
+        @if (editingCertificate()) { <label>{{ 'resources.correctionReason' | translate }}<input formControlName="reason" />
+          <s2s-form-errors [control]="certForm.controls.reason" /></label> }
+        <label>{{ 'resources.file' | translate }}<input type="file" accept="application/pdf,image/png,image/jpeg" (change)="setFile($event)" /></label>
+        <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || certForm.invalid" />
+      </form> }
+      @if (editingCertificate()) { <h3>{{ 'audit.history' | translate }}</h3>
+        <div class="cards">@for (change of changeHistory(); track change.occurredAt) {
+          <article class="card"><strong>{{ change.occurredAt }}</strong><p>{{ change.actorName }}</p><p>{{ change.details }}</p></article>
+        }</div> }
+    </section>
+    @if (owner.kind === 'assets') { <section class="s2s-panel"><h2>{{ 'resources.inspections' | translate }}</h2>
+      <div class="cards">@for (row of inspections(); track row.id) { <article class="card"><strong>{{ row.inspectedAt }} · {{ row.result }}</strong><p>{{ row.source }}</p>
+        @if (canWrite) { <p-button size="small" [label]="'common.edit' | translate" (onClick)="editInspection(row)" /> }
+      </article> }</div>
+      @if (canWrite) { <form [formGroup]="inspectionForm" (ngSubmit)="saveInspection()" class="fields">
+        <label>{{ 'resources.inspectedAt' | translate }}<input type="date" formControlName="inspectedAt" required /><s2s-form-errors [control]="inspectionForm.controls.inspectedAt" /></label>
+        <label>{{ 'resources.result' | translate }}<input formControlName="result" required /><s2s-form-errors [control]="inspectionForm.controls.result" /></label>
+        <label>{{ 'resources.source' | translate }}<input formControlName="source" required /><s2s-form-errors [control]="inspectionForm.controls.source" /></label>
+        <label>{{ 'resources.nextDueAt' | translate }}<input type="date" formControlName="nextDueAt" /><s2s-form-errors [control]="inspectionForm.controls.nextDueAt" /></label>
+        @if (editingInspection()) { <label>{{ 'resources.correctionReason' | translate }}<input formControlName="reason" />
+          <s2s-form-errors [control]="inspectionForm.controls.reason" /></label> }
+        <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || inspectionForm.invalid" />
+      </form> }
+      @if (editingInspection()) { <h3>{{ 'audit.history' | translate }}</h3>
+        <div class="cards">@for (change of changeHistory(); track change.occurredAt) {
+          <article class="card"><strong>{{ change.occurredAt }}</strong><p>{{ change.actorName }}</p><p>{{ change.details }}</p></article>
+        }</div> }
+    </section> }
+  }
+
+  <section class="s2s-panel"><h2>{{ 'resources.catalogues' | translate }}</h2>
+    <div class="cards">
+      @for (row of categories(); track row.code) { <article class="card"><strong>{{ row.code }} · {{ row.label }}</strong>
+        @if (canWrite) { <p-button size="small" [label]="'common.edit' | translate" (onClick)="editCode('categories', row)" /> }</article> }
+      @for (row of competencies(); track row.code) { <article class="card"><strong>{{ row.code }} · {{ row.label }}</strong>
+        @if (canWrite) { <p-button size="small" [label]="'common.edit' | translate" (onClick)="editCode('competencies', row)" /> }</article> }
+      @for (row of certificateTypes(); track row.code) { <article class="card"><strong>{{ row.code }} · {{ row.label }}</strong>
+        @if (canWrite) { <p-button size="small" [label]="'common.edit' | translate" (onClick)="editCode('certificate-types', row)" /> }</article> }
+    </div>
+    @if (canWrite) { <form [formGroup]="codeForm" (ngSubmit)="saveCode()" class="fields">
+      <label>{{ 'resources.catalogue' | translate }}<select formControlName="kind"><option value="categories">{{ 'resources.categories' | translate }}</option>
+        <option value="competencies">{{ 'resources.competencies' | translate }}</option>
+        <option value="certificate-types">{{ 'resources.certificateTypes' | translate }}</option></select><s2s-form-errors [control]="codeForm.controls.kind" /></label>
+      <label>{{ 'resources.code' | translate }}<input formControlName="code" required /><s2s-form-errors [control]="codeForm.controls.code" /></label>
+      <label>{{ 'resources.name' | translate }}<input formControlName="label" required /><s2s-form-errors [control]="codeForm.controls.label" /></label>
+      @if (codeForm.controls.kind.value === 'categories') {
+        <label>{{ 'resources.costHead' | translate }}<select formControlName="costHeadId"><option value=""></option>
+          @for (row of costHeads(); track row.value) { <option [value]="row.value">{{ row.label }}</option> }</select><s2s-form-errors [control]="codeForm.controls.costHeadId" /></label>
+      }
+      <label class="check"><input type="checkbox" formControlName="active" />{{ 'resources.active' | translate }}<s2s-form-errors [control]="codeForm.controls.active" /></label>
+      <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || codeForm.invalid" />
+    </form> }
+  </section>
+  <section class="s2s-panel"><h2>{{ 'resources.certificatePolicy' | translate }}</h2>
+    @if (policy(); as currentPolicy) { <p>{{ currentPolicy.mode }} · {{ currentPolicy.requirementsConfigured ? ('resources.configured' | translate) : ('resources.pending' | translate) }}</p> }
+    @if (canWrite) { <form [formGroup]="policyForm" (ngSubmit)="savePolicy()" class="fields">
+      <label>{{ 'resources.policyModeLabel' | translate }}<select formControlName="mode"><option value="BLOCK">{{ 'resources.block' | translate }}</option>
+        <option value="WARN">{{ 'resources.warn' | translate }}</option></select><s2s-form-errors [control]="policyForm.controls.mode" /></label>
+      <label>{{ 'resources.warningDays' | translate }}<input type="number" min="0" formControlName="warningDays" /><s2s-form-errors [control]="policyForm.controls.warningDays" /></label>
+      <label class="check"><input type="checkbox" formControlName="requirementsConfigured" />{{ 'resources.requirementsConfigured' | translate }}<s2s-form-errors [control]="policyForm.controls.requirementsConfigured" /></label>
+      <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy()" />
+    </form> }
+    <h3>{{ 'resources.requirements' | translate }}</h3>
+    <div class="cards">@for (row of requirements(); track row.id) { <article class="card"><strong>{{ row.resourceKind }} · {{ row.scopeCode }}</strong><p>{{ row.certificateTypeCode }}</p></article> }</div>
+    @if (canWrite) { <form [formGroup]="requirementForm" (ngSubmit)="saveRequirement()" class="fields">
+      <label>{{ 'resources.kindLabel' | translate }}<select formControlName="resourceKind"><option value="ASSET">{{ 'resources.kindAsset' | translate }}</option>
+        <option value="PERSON">{{ 'resources.kindPerson' | translate }}</option></select><s2s-form-errors [control]="requirementForm.controls.resourceKind" /></label>
+      <label>{{ 'resources.scopeCode' | translate }}<input formControlName="scopeCode" required /><s2s-form-errors [control]="requirementForm.controls.scopeCode" /></label>
+      <label>{{ 'resources.certificateType' | translate }}<select formControlName="certificateTypeCode"><option value=""></option>
+        @for (row of certificateTypes(); track row.code) { <option [value]="row.code">{{ row.label }}</option> }</select><s2s-form-errors [control]="requirementForm.controls.certificateTypeCode" /></label>
+      <p-button type="submit" [label]="'common.save' | translate" [disabled]="busy() || requirementForm.invalid" />
+    </form> }
+  </section>

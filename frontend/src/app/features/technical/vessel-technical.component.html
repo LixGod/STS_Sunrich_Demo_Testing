@@ -1,0 +1,187 @@
+<s2s-page-header
+  [heading]="vessel()?.name ?? ('nav.vesselParticulars' | translate)"
+  [subtitle]="vessel() ? 'IMO ' + vessel()!.imo + ' · ' + ('enums.vesselType.' + vessel()!.vesselType | translate) : null">
+  @if (vessel(); as v) {
+    <s2s-status-tag [status]="v.particularsStatus" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+
+<!-- Source documents -->
+<section class="s2s-panel" aria-labelledby="documents-title">
+  <h2 id="documents-title">{{ 'documents.title' | translate }}</h2>
+  @if (canUpload()) {
+    <div class="upload">
+      <s2s-form-field labelKey="documents.type" fieldId="upload-type">
+        <p-select inputId="upload-type" [options]="documentTypes()" optionLabel="label" optionValue="value"
+          [ngModel]="uploadType()" (ngModelChange)="uploadType.set($event)" [placeholder]="'common.select' | translate" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="documents.titleLabel" fieldId="upload-title">
+        <input pInputText id="upload-title" maxlength="200" [ngModel]="uploadTitle()" (ngModelChange)="uploadTitle.set($event)" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="documents.file" fieldId="upload-file" hintKey="documents.fileHint">
+        <input #fileInput id="upload-file" type="file" class="file" [accept]="accept" (change)="pickFile($event)" />
+      </s2s-form-field>
+      <div class="upload-action">
+        <p-button [label]="'documents.upload' | translate" icon="pi pi-upload" [disabled]="!uploadFile() || !uploadType() || uploadProgress() !== null"
+          (onClick)="uploadNow(fileInput)" />
+      </div>
+    </div>
+    @if (uploadProgress() !== null) {
+      <p-progressbar [value]="uploadProgress()" [showValue]="true" class="progress" />
+    }
+    @if (uploadError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+  }
+
+  @if (documents().length) {
+    <ul class="documents">
+      @for (document of documents(); track document.id) {
+        <li [class.current]="viewing()?.id === document.file?.id" [class.old]="!document.latest">
+          <button type="button" class="doc" (click)="view(document)">
+            <i [class]="document.file?.contentType === 'application/pdf' ? 'pi pi-file-pdf' : 'pi pi-image'" aria-hidden="true"></i>
+            <span class="doc-main">
+              <strong>{{ document.documentTypeName }} · v{{ document.versionNo }}</strong>
+              <span>{{ document.title ?? document.file?.name }}</span>
+            </span>
+            <span class="doc-side">
+              @if (document.file?.scanState === 'NOT_SCANNED') {
+                <s2s-status-tag status="NOT_SCANNED" />
+              }
+              <span class="s2s-muted">{{ document.uploadedByName }} · {{ document.uploadedAt | utcDateTime }}</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="s2s-muted">{{ 'documents.empty' | translate }}</p>
+  }
+</section>
+
+<!-- Particulars -->
+@if (showParticulars()) {
+<section class="s2s-panel" aria-labelledby="particulars-title">
+  <div class="section-head">
+    <h2 id="particulars-title">{{ 'technical.particulars' | translate }}</h2>
+    <div class="head-actions">
+      @if (overview()?.versions?.length) {
+        <p-select inputId="particulars-version" [options]="versionOptions()" optionLabel="label" optionValue="value"
+          [ngModel]="current()?.id" (ngModelChange)="selectVersion($event)" [ariaLabel]="'technical.version' | translate" />
+      }
+      @if (overview()?.canCreateVersion) {
+        <p-button [label]="(overview()?.versions?.length ? 'technical.newVersion' : 'technical.start') | translate" icon="pi pi-plus"
+          [outlined]="!!overview()?.versions?.length" [loading]="saving()" (onClick)="newVersion()" />
+      }
+    </div>
+  </div>
+
+  @if (!current()) {
+    <p class="s2s-muted">{{ 'technical.noParticulars' | translate }}</p>
+  } @else {
+    @let p = current()!;
+    <div class="status-line">
+      <s2s-status-tag [status]="p.status" />
+      @if (p.submittedAt) {
+        <span class="s2s-muted">{{ 'technical.submitted' | translate: { name: p.submittedByName, at: (p.submittedAt | utcDateTime) } }}</span>
+      }
+      @if (p.verifiedAt) {
+        <span class="s2s-muted">{{ 'technical.verified' | translate: { name: p.verifiedByName, at: (p.verifiedAt | utcDateTime) } }}</span>
+      }
+    </div>
+    @if (p.returnedReason && p.status === 'DRAFT') {
+      <p-message severity="warn" [text]="'technical.returned' | translate: { reason: p.returnedReason }" />
+    }
+    @for (warning of p.warnings; track warning.code) {
+      <p-message severity="warn" [text]="warning.message" />
+    }
+    @if (verifying()) {
+      <p-message severity="info" [text]="'technical.verifyHint' | translate" />
+    }
+
+    <div class="workspace">
+      <form [formGroup]="form" novalidate class="entry" (ngSubmit)="save()">
+        @for (group of groups(); track group.group) {
+          <fieldset>
+            <legend>{{ 'technical.group.' + group.group | translate }}</legend>
+            @for (field of group.fields; track field.code) {
+              @let r = row(field.code);
+              <div class="value-row" [class.warned]="isWarned(field.code)" [formGroup]="r">
+                <s2s-form-field class="value" [labelKey]="field.label" [fieldId]="'v-' + field.code" [control]="r.controls.value">
+                  <span class="with-unit">
+                    <input pInputText [id]="'v-' + field.code" formControlName="value" maxlength="100"
+                      [attr.inputmode]="field.dataType === 'NUMBER' ? 'decimal' : null" />
+                    @if (field.unit) {
+                      <span class="unit">{{ field.unit }}</span>
+                    }
+                  </span>
+                </s2s-form-field>
+                <s2s-form-field class="source" labelKey="technical.source" [fieldId]="'s-' + field.code" [control]="r.controls.sourceDocumentId">
+                  <p-select [inputId]="'s-' + field.code" formControlName="sourceDocumentId" [options]="sourceOptions()" optionLabel="label"
+                    optionValue="value" [showClear]="true" appendTo="body" [placeholder]="'common.select' | translate" />
+                </s2s-form-field>
+                <s2s-form-field class="page" labelKey="technical.page" [fieldId]="'pg-' + field.code" [control]="r.controls.sourcePage">
+                  <p-inputnumber [inputId]="'pg-' + field.code" formControlName="sourcePage" [min]="1" [max]="9999" [useGrouping]="false" />
+                </s2s-form-field>
+                <div class="row-actions">
+                  <p-button type="button" icon="pi pi-eye" [text]="true" [disabled]="!r.controls.sourceDocumentId.value"
+                    [ariaLabel]="'technical.showSource' | translate" (onClick)="viewSource(field.code)" />
+                  @if ((verifying() || p.status === 'VERIFIED' || p.status === 'SUPERSEDED') && r.controls.value.value) {
+                    <label class="confirm" [for]="'c-' + field.code">
+                      <p-checkbox [inputId]="'c-' + field.code" formControlName="confirmed" [binary]="true" />
+                      {{ 'technical.checked' | translate }}
+                    </label>
+                  }
+                </div>
+              </div>
+            }
+          </fieldset>
+        }
+        <s2s-form-field labelKey="technical.notes" fieldId="p-notes" [control]="form.controls.notes">
+          <textarea pTextarea id="p-notes" formControlName="notes" rows="2" maxlength="1000"></textarea>
+        </s2s-form-field>
+
+        <div class="s2s-actions">
+          @if (can().has('EDIT')) {
+            <p-button type="submit" [label]="'common.save' | translate" icon="pi pi-check" [outlined]="true" [loading]="saving()" />
+          }
+          @if (can().has('SUBMIT')) {
+            <p-button type="button" [label]="'technical.submit' | translate" icon="pi pi-send" [loading]="saving()" (onClick)="submit()" />
+          }
+          @if (can().has('RETURN')) {
+            <p-button type="button" [label]="'technical.return' | translate" icon="pi pi-replay" severity="secondary" [outlined]="true"
+              (onClick)="returning.set(true)" />
+          }
+          @if (can().has('VERIFY')) {
+            <p-button type="button" [label]="'technical.verify' | translate" icon="pi pi-verified" [disabled]="!allConfirmed()"
+              [loading]="saving()" (onClick)="verify()" />
+          }
+        </div>
+      </form>
+
+      <aside class="source-pane" [attr.aria-label]="'technical.sourcePane' | translate">
+        <s2s-document-viewer [file]="viewing()" />
+      </aside>
+    </div>
+  }
+</section>
+}
+
+<s2s-reason-dialog
+  [visible]="returning()"
+  (visibleChange)="closeReturn($event)"
+  headerKey="technical.return"
+  messageKey="technical.returnHint"
+  confirmKey="technical.return"
+  [reasonRequired]="true"
+  [saving]="saving()"
+  (confirmed)="confirmReturn($event)" />

@@ -1,0 +1,19 @@
+:host { display: block; min-width: 0; max-width: 100%; }
+.s2s-panel { margin-block: 1rem; min-width: 0; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+.fields.compact { margin-block: 1rem; }
+.wide { grid-column: 1 / -1; }
+label { display: grid; gap: 0.3rem; font-weight: 600; min-width: 0; }
+label.check { display: flex; align-items: center; font-weight: 400; min-height: 44px; }
+label.check input { width: auto; }
+input, select, textarea, button { font: inherit; min-height: 44px; }
+input, select, textarea { width: 100%; min-width: 0; padding: 0.55rem; border: 1px solid #aab7c4; border-radius: 0.4rem; }
+fieldset { min-width: 0; border: 1px solid #ccd4dc; border-radius: 0.4rem; }
+.actions { display: flex; flex-wrap: wrap; align-items: end; gap: 0.5rem; margin-top: 0.7rem; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.35rem 1rem; }
+.facts div { display: grid; grid-template-columns: minmax(7rem, 1fr) 2fr; gap: 0.4rem; }
+.facts dt { color: #536171; }.facts dd { margin: 0; overflow-wrap: anywhere; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 0.8rem; }
+.card { border: 1px solid #ccd4dc; border-radius: 0.6rem; padding: 0.8rem; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .fields, .facts { grid-template-columns: minmax(0, 1fr); }
+  .wide { grid-column: auto; }.facts div { grid-template-columns: minmax(0, 1fr); } }

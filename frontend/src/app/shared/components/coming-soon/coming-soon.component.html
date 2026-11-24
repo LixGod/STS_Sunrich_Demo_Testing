@@ -1,0 +1,7 @@
+@if (navGroup(); as group) {
+  <s2s-page-header [heading]="group.labelKey | translate" />
+  <section class="s2s-panel">
+    <p>{{ 'comingSoon.phase' | translate: { phase: group.phase } }}</p>
+    <p class="s2s-muted">{{ 'comingSoon.' + group.id | translate }}</p>
+  </section>
+}

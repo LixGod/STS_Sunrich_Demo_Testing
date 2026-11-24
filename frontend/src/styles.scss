@@ -1,0 +1,275 @@
+// Global tokens and a few layout utilities. Component styles live next to their components.
+:root {
+  --s2s-bg: #f6f3f1;
+  --s2s-surface: #fffefd;
+  --s2s-border: #e5ddda;
+  --s2s-text: #29272b;
+  --s2s-text-muted: #68656b;
+  --s2s-brand: #9b2c36;
+  --s2s-brand-dark: #76212a;
+  --s2s-charcoal: #27252a;
+  --s2s-silver: #f0eae8;
+  --s2s-nav-bg: #241d25;
+  --s2s-nav-text: #eee7e8;
+  --s2s-nav-active: #9b2c36;
+  --s2s-radius: 16px;
+  --s2s-radius-sm: 10px;
+  --s2s-gap: 1rem;
+  --s2s-topbar-height: 4rem;
+  --s2s-sidenav-width: 16.75rem;
+  --s2s-shadow: 0 2px 8px rgb(39 27 34 / 4%), 0 14px 28px rgb(39 27 34 / 3%);
+  --s2s-shadow-md: 0 6px 18px rgb(39 27 34 / 8%);
+  --s2s-shadow-lg: 0 16px 38px rgb(39 27 34 / 12%);
+  --s2s-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%; // respect the user's browser font size and zoom
+}
+
+body {
+  margin: 0;
+  font-family: var(--s2s-font);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--s2s-text);
+  background:
+    radial-gradient(1200px 420px at 0 -80px, rgb(155 44 54 / 7%), transparent 55%),
+    var(--s2s-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--s2s-charcoal);
+}
+
+a {
+  color: var(--p-primary-600, #84252e);
+  text-underline-offset: 0.16em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--p-primary-500, #9b2c36);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Card-like section used by list and form pages.
+.s2s-panel {
+  background: var(--s2s-surface);
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+  padding: clamp(1rem, 1.6vw, 1.5rem);
+  box-shadow: var(--s2s-shadow);
+}
+
+// Responsive form grid: one column on phones, two from tablet width.
+.s2s-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem 1.25rem;
+
+  @media (min-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .s2s-span-2 {
+    grid-column: 1 / -1;
+  }
+}
+
+// Primary actions; sticky at the bottom of the screen on phones so they stay reachable.
+.s2s-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: var(--s2s-gap);
+
+  @media (max-width: 767.98px) {
+    position: sticky;
+    bottom: 0;
+    background: var(--s2s-surface);
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--s2s-border);
+  }
+}
+
+.s2s-muted {
+  color: var(--s2s-text-muted);
+}
+
+.s2s-optional-details {
+  margin-block: 0.5rem;
+
+  > summary {
+    width: fit-content;
+    color: var(--s2s-text-muted);
+    cursor: pointer;
+    font-weight: 600;
+  }
+}
+
+// Inputs fill their grid cell.
+.s2s-form-grid .p-inputtext,
+.s2s-form-grid .p-select,
+.s2s-form-grid .p-inputnumber,
+.s2s-form-grid .p-textarea,
+.s2s-form-grid .p-datepicker {
+  width: 100%;
+}
+
+.p-datatable {
+  --p-datatable-header-cell-background: #f5f1ef;
+  --p-datatable-header-cell-color: var(--s2s-text-muted);
+  --p-datatable-row-hover-background: #fbf6f4;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+  overflow: hidden;
+  background: var(--s2s-surface);
+  box-shadow: var(--s2s-shadow);
+}
+
+@media (min-width: 768px) {
+  .p-datatable-tbody > tr {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 45px;
+  }
+}
+
+.p-datatable-thead > tr > th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.p-datatable-tbody > tr > td { border-color: var(--s2s-border); }
+
+.p-button {
+  --p-button-border-radius: 0.65rem;
+}
+
+.p-inputtext,
+.p-select,
+.p-textarea,
+.p-password {
+  --p-inputtext-border-radius: 0.65rem;
+  --p-select-border-radius: 0.65rem;
+  --p-textarea-border-radius: 0.65rem;
+}
+
+.p-dialog {
+  --p-dialog-border-radius: 1rem;
+}
+
+.p-tag {
+  --p-tag-border-radius: 999px;
+}
+
+// Plain HTML controls in page content look like the PrimeNG ones. :where() keeps specificity at zero so component styles win.
+:where(#main-content) :where(button:not([class*='p-'])) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--s2s-text);
+  background: var(--s2s-surface);
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s;
+
+  &:hover:not(:disabled) { border-color: var(--s2s-brand); color: var(--s2s-brand); transform: translateY(-1px); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+:where(#main-content) :where(button[type='submit']:not([class*='p-'])) {
+  color: #fff;
+  background: var(--s2s-brand);
+  border-color: var(--s2s-brand);
+
+  &:hover:not(:disabled) { color: #fff; background: var(--s2s-brand-dark); }
+}
+
+:where(#main-content) :where(input:not([type='checkbox'], [type='radio'], [type='file'], [class*='p-']), select:not([class*='p-']), textarea:not([class*='p-'])) {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--s2s-text);
+  background: var(--s2s-surface);
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius-sm);
+
+  &:focus { border-color: var(--s2s-brand); outline: none; box-shadow: 0 0 0 3px rgb(155 44 54 / 15%); }
+  &:disabled { background: #f1edeb; color: #69636a; }
+}
+
+:where(#main-content) :where(label) { color: var(--s2s-charcoal); font-weight: 600; }
+
+:where(#main-content) :where(fieldset) {
+  border-color: var(--s2s-border);
+  border-radius: var(--s2s-radius);
+}
+
+:where(#main-content) :where(legend) { color: var(--s2s-charcoal); font-weight: 700; padding-inline: 0.4rem; }
+
+:where(#main-content) :where(input[type='file']) { max-width: 100%; color: var(--s2s-text-muted); }
+:where(#main-content) input[type='file']::file-selector-button {
+  margin-right: 0.7rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius-sm);
+  background: var(--s2s-surface);
+  color: var(--s2s-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+:where(#main-content) :where(input[type='checkbox']:not([class*='p-']), input[type='radio']:not([class*='p-'])) {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--s2s-brand);
+  cursor: pointer;
+}
+
+:where(#main-content) :where(details > summary) {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

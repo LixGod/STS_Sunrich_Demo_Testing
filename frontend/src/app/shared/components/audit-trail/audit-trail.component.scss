@@ -1,0 +1,37 @@
+.trail {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--s2s-border);
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.action {
+  font-weight: 600;
+}
+
+.when {
+  font-size: 0.8125rem;
+}
+
+.details {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem;
+  max-height: 16rem;
+  overflow: auto;
+  font-size: 0.75rem;
+  background: var(--s2s-bg);
+  border-radius: var(--s2s-radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

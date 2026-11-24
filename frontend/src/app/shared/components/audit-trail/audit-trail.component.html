@@ -1,0 +1,41 @@
+<ol class="trail">
+  @for (event of events(); track event.seq) {
+    <li>
+      <div class="line">
+        <span class="action">{{ 'audit.action.' + event.action | translate }}</span>
+        @if (!entityId() && event.entityType) {
+          <span class="entity">{{ 'audit.entity.' + event.entityType | translate }}</span>
+        }
+        <span class="by">{{ event.actorName ?? ('audit.system' | translate) }}</span>
+        <time class="when s2s-muted" [attr.datetime]="event.occurredAt">{{ event.occurredAt | utcDateTime }}</time>
+        @if (event.details) {
+          <p-button
+            [label]="(expanded() === event.seq ? 'audit.hideDetails' : 'audit.showDetails') | translate"
+            [text]="true"
+            size="small"
+            (onClick)="toggle(event.seq)" />
+        }
+      </div>
+      @if (expanded() === event.seq) {
+        <pre class="details">{{ event.details | json }}</pre>
+      }
+    </li>
+  } @empty {
+    @if (!loading() && !failed()) {
+      <li class="s2s-muted">{{ 'audit.empty' | translate }}</li>
+    }
+  }
+</ol>
+
+@if (failed()) {
+  <p class="s2s-muted" role="alert">{{ 'table.loadFailed' | translate }}</p>
+}
+@if (nextCursor() || loading()) {
+  <p-button
+    [label]="'audit.loadMore' | translate"
+    [outlined]="true"
+    size="small"
+    [loading]="loading()"
+    [disabled]="!nextCursor()"
+    (onClick)="loadMore()" />
+}

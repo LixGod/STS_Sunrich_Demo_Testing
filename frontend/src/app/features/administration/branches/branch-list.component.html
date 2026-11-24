@@ -1,0 +1,15 @@
+<s2s-page-header [heading]="'nav.branches' | translate" [subtitle]="'masters.branch.subtitle' | translate">
+  <p-button *s2sCan="permissions.masterOrgWrite" [label]="'common.add' | translate" icon="pi pi-plus" routerLink="new" />
+</s2s-page-header>
+
+<section class="s2s-panel">
+  <s2s-data-table
+    [columns]="columns"
+    [load]="load"
+    [params]="params()"
+    [actions]="actions"
+    defaultSort="name,asc"
+    captionKey="nav.branches">
+    <s2s-active-filter tableToolbar [(value)]="active" />
+  </s2s-data-table>
+</section>

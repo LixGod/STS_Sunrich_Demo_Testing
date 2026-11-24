@@ -1,0 +1,95 @@
+<s2s-page-header [heading]="'resources.jobTitle' | translate" [subtitle]="context()?.jobNumber ?? ''" />
+
+<p class="navigation"><a [routerLink]="['/jobs', jobId()]">{{ 'resources.backToJob' | translate }}</a></p>
+@if (errorKey(); as error) { <p-message severity="error" role="alert" [text]="error | translate" /> }
+@if (success()) { <p-message severity="success" [text]="'resources.saved' | translate" /> }
+
+@if (context(); as ctx) {
+  <p class="s2s-muted">{{ 'resources.zoneHint' | translate: { zone: ctx.timeZone } }}</p>
+  @if (policy(); as currentPolicy) {
+    <p-message [severity]="currentPolicy.requirementsConfigured ? 'info' : 'warn'"
+      [text]="(currentPolicy.requirementsConfigured ? 'resources.policyMode' : 'resources.policyPending') | translate: { mode: currentPolicy.mode }" />
+  }
+
+  @if (canWrite()) {
+    <section class="s2s-panel editor" aria-labelledby="allocation-editor">
+      <h2 id="allocation-editor">{{ (editing() ? 'resources.editAllocation' : 'resources.addAllocation') | translate }}</h2>
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <div class="fields">
+          <label>{{ 'resources.kindLabel' | translate }}
+            <select formControlName="kind">
+              <option value="ASSET">{{ 'resources.kindAsset' | translate }}</option>
+              <option value="PERSON">{{ 'resources.kindPerson' | translate }}</option>
+            </select>
+          </label>
+          <label>{{ 'table.search' | translate }}
+            <input type="search" [formControl]="resourceSearch" (input)="search()" />
+          </label>
+          <label>{{ 'resources.resource' | translate }}
+            <select formControlName="resourceId" required>
+              <option value="">{{ 'resources.chooseResource' | translate }}</option>
+              @for (choice of choices(); track choice.id) { <option [value]="choice.id">{{ choice.label }}</option> }
+            </select>
+          </label>
+          <div><label for="allocation-from">{{ 'resources.fromLocal' | translate: { zone: ctx.timeZone } }}</label>
+            <s2s-date-time-picker inputId="allocation-from" formControlName="fromLocal" [localString]="true" required />
+          </div>
+          <div><label for="allocation-to">{{ 'resources.toLocal' | translate: { zone: ctx.timeZone } }}</label>
+            <s2s-date-time-picker inputId="allocation-to" formControlName="toLocal" [localString]="true" required />
+          </div>
+          <label class="wide">{{ 'resources.exceptionReason' | translate }}
+            <textarea rows="2" formControlName="exceptionReason"></textarea>
+          </label>
+        </div>
+        @if (collision()) { <p-message severity="warn" [text]="'resources.collisionPrompt' | translate" /> }
+        <div class="actions">
+          <p-button type="submit" [label]="'common.save' | translate" [disabled]="saving() || form.invalid" />
+          @if (editing()) { <p-button type="button" [label]="'common.cancel' | translate" severity="secondary" (onClick)="edit(null)" /> }
+        </div>
+      </form>
+    </section>
+  }
+
+  <section class="s2s-panel" aria-labelledby="allocation-list">
+    <h2 id="allocation-list">{{ 'resources.allocations' | translate }}</h2>
+    @if (rows().length === 0) { <p class="s2s-muted">{{ 'resources.noAllocations' | translate }}</p> }
+    <div class="cards">
+      @for (row of rows(); track row.id) {
+        <article class="card">
+          <header><strong>{{ row.identifier }}</strong><s2s-status-tag [status]="row.status" /></header>
+          <dl>
+            <div><dt>{{ 'resources.kindLabel' | translate }}</dt><dd>{{ 'resources.kind.' + row.kind | translate }}</dd></div>
+            @if (row.category) { <div><dt>{{ 'resources.category' | translate }}</dt><dd>{{ row.category }}</dd></div> }
+            <div><dt>{{ 'resources.from' | translate }}</dt><dd>{{ display(row.startAt) }}</dd></div>
+            <div><dt>{{ 'resources.to' | translate }}</dt><dd>{{ display(row.endAt) }}</dd></div>
+            @if (row.exceptionReason) { <div><dt>{{ 'resources.exceptionReason' | translate }}</dt><dd>{{ row.exceptionReason }}</dd></div> }
+          </dl>
+          @for (message of row.eligibilityMessages; track message) { <p-message severity="warn" [text]="message" /> }
+          @if (row.collisionIds.length) { <p-message severity="warn" [text]="'resources.collisionCount' | translate: { count: row.collisionIds.length }" /> }
+          <div class="actions">
+            @if (canWrite() && (row.status === 'ACTIVE' || row.status === 'REJECTED')) {
+              <p-button [label]="'common.edit' | translate" size="small" (onClick)="edit(row)" />
+            }
+            @if (canApprove() && row.status === 'PENDING_EXCEPTION') {
+              <p-button [label]="'resources.approveException' | translate" size="small" (onClick)="decide(row, 'APPROVE')" />
+              <p-button [label]="'resources.returnException' | translate" size="small" severity="secondary" (onClick)="decide(row, 'RETURN')" />
+            }
+            @if (canWrite() && row.status !== 'CANCELLED') {
+              <p-button [label]="'resources.cancelAllocation' | translate" size="small" severity="secondary" (onClick)="cancel(row)" />
+            }
+          </div>
+        </article>
+      }
+    </div>
+    @if (rows().length) {
+      <label class="decision-reason">{{ 'resources.decisionReason' | translate }}
+        <textarea rows="2" [formControl]="decisionReason"></textarea>
+      </label>
+    }
+    <nav class="pager" [attr.aria-label]="'resources.pagination' | translate">
+      <p-button [label]="'resources.previous' | translate" severity="secondary" [disabled]="page() === 0" (onClick)="loadPage(page() - 1)" />
+      <span>{{ page() + 1 }}</span>
+      <p-button [label]="'resources.next' | translate" severity="secondary" [disabled]="(page() + 1) * 25 >= total()" (onClick)="loadPage(page() + 1)" />
+    </nav>
+  </section>
+}

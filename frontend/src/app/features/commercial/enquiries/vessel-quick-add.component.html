@@ -1,0 +1,27 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: 'min(40rem, 96vw)' }"
+  [breakpoints]="{ '640px': '100vw' }"
+  [header]="'enquiry.addVessel' | translate">
+  <p class="s2s-muted">{{ 'enquiry.addVesselHint' | translate }}</p>
+  @if (errorKey(); as key) {
+    <p-message severity="error" role="alert" [text]="key | translate" />
+  }
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate id="vessel-quick-add">
+    <s2s-form-field labelKey="masters.vessel.imo" fieldId="qa-imo" [control]="form.controls.imo" [required]="true" hintKey="masters.vessel.imoHint">
+      <input pInputText id="qa-imo" formControlName="imo" maxlength="7" inputmode="numeric" autocomplete="off" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.name" fieldId="qa-name" [control]="form.controls.name" [required]="true">
+      <input pInputText id="qa-name" formControlName="name" maxlength="150" autocapitalize="characters" autocomplete="off" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.vessel.type" fieldId="qa-type" [control]="form.controls.vesselType" [required]="true">
+      <p-select inputId="qa-type" formControlName="vesselType" [options]="typeOptions()" optionLabel="label" optionValue="value" appendTo="body" [placeholder]="'common.select' | translate" />
+    </s2s-form-field>
+  </form>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="visible.set(false)" />
+    <p-button (onClick)="save()" [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" />
+  </ng-template>
+</p-dialog>

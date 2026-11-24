@@ -1,0 +1,14 @@
+<label [attr.for]="fieldId()">
+  {{ labelKey() | translate }}
+  @if (required()) {
+    <span class="required" aria-hidden="true">*</span>
+    <span class="sr-only">({{ 'validation.requiredLabel' | translate }})</span>
+  }
+</label>
+<ng-content />
+@if (hintKey(); as hint) {
+  <small class="hint">{{ hint | translate }}</small>
+}
+@if (control(); as ctrl) {
+  <s2s-form-errors [control]="ctrl" [errorId]="fieldId() + '-error'" />
+}

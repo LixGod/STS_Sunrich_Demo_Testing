@@ -1,0 +1,43 @@
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding: 1.1rem 1.35rem;
+  background: var(--s2s-surface);
+  border: 1px solid var(--s2s-border);
+  border-left: 4px solid var(--s2s-brand);
+  border-radius: var(--s2s-radius);
+  box-shadow: var(--s2s-shadow);
+}
+
+h1 {
+  font-size: clamp(1.45rem, 2vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0.25rem 0 0;
+  color: var(--s2s-text-muted);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+  color: var(--s2s-brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.back-link:hover, .back-link:focus-visible { text-decoration: underline; }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

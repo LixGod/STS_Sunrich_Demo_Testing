@@ -1,0 +1,30 @@
+.dialog-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.history {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--s2s-border);
+  padding-top: 0.75rem;
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+}
+
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-select,
+:host ::ng-deep .p-datepicker {
+  width: 100%;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+}

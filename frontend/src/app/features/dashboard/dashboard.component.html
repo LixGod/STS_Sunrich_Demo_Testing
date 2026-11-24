@@ -1,0 +1,214 @@
+@if (user(); as current) {
+  <div class="dashboard">
+    <header class="page-head">
+      <h1>{{ 'dashboard.welcome' | translate: { name: current.fullName } }}</h1>
+      <p>{{ today | date: 'EEEE d MMMM y' }}</p>
+    </header>
+
+    @if (myWork().steps.length) {
+      <section class="s2s-panel start-card" aria-labelledby="my-work-title">
+        <div class="start-heading">
+          <span class="eyebrow">{{ myWork().title }}</span>
+          <h2 id="my-work-title">Start here</h2>
+        </div>
+        <ol class="start-steps">
+          @for (step of myWork().steps; track step.route) {
+            <li><a [routerLink]="step.route"><span class="step-no">{{ $index + 1 }}</span>
+              <span><strong>{{ step.label }}</strong><small>{{ step.detail }}</small></span>
+              <span class="step-arrow" aria-hidden="true">→</span></a></li>
+          }
+        </ol>
+      </section>
+    }
+
+    @if (kpis().length) {
+      <section class="kpis" [attr.aria-label]="'dashboard.keyFigures' | translate">
+        @for (kpi of kpis(); track kpi.key) {
+          <a class="kpi" [class.attention]="kpi.attention" [routerLink]="kpi.route">
+            <span>{{ kpi.labelKey | translate }}</span>
+            @switch (kpi.value) {
+              @case (null) { <strong class="muted">{{ 'dashboard.loading' | translate }}</strong> }
+              @case ('error') { <strong class="muted">{{ 'dashboard.unavailable' | translate }}</strong> }
+              @default { <strong>{{ kpi.value }}</strong> }
+            }
+          </a>
+        }
+      </section>
+    }
+
+    @if (canReadJobs) {
+      <section class="s2s-panel" aria-labelledby="board-title">
+        <div class="card-head">
+          <h2 id="board-title">Jobs in the STS flow</h2>
+          <a routerLink="/jobs">{{ 'dashboard.viewAll' | translate }}</a>
+        </div>
+        @if (stageChart(); as chart) {
+          <div class="chart-block stage-chart">
+            <h3>{{ 'dashboard.stageChart' | translate }}</h3>
+            @if (chart.total) {
+              @defer (on viewport) {
+                <s2s-dashboard-chart [config]="chart.config" [summary]="chart.summary" height="16rem" />
+              } @placeholder {
+                <div style="height:16rem" aria-hidden="true"></div>
+              }
+            } @else {
+              <p class="muted">{{ 'dashboard.noActiveJobs' | translate }}</p>
+            }
+          </div>
+        }
+        @switch (board()) {
+          @case (null) { <p class="muted">{{ 'dashboard.loading' | translate }}</p> }
+          @case ('error') { <p role="alert">{{ 'dashboard.loadFailed' | translate }}</p> }
+          @default {
+            <ul class="board">
+              @for (job of $any(board()).items; track job.id) {
+                <li><a [routerLink]="['/jobs', job.id]">
+                  <span class="row-main"><strong>{{ job.jobNumber }}</strong>
+                    <span class="muted">{{ job.motherVesselName ?? '—' }} / {{ job.daughterVesselName ?? '—' }}</span></span>
+                  <span class="stage">
+                    <span class="stage-label">{{ stageLabel(job.status) }}</span>
+                    <span class="dots" aria-hidden="true">@for (n of stepNumbers; track n) {
+                      <i [class.done]="n < stepOf(job.status)" [class.now]="n === stepOf(job.status)"></i> }</span>
+                  </span>
+                </a></li>
+              } @empty {
+                <li class="muted">{{ 'dashboard.noJobs' | translate }}</li>
+              }
+            </ul>
+          }
+        }
+      </section>
+    }
+
+    @if (canReadJobs || canSeeApprovals) {
+      <div class="work" [class.single]="!(canReadJobs && canSeeApprovals)">
+        @if (canReadJobs) { <s2s-action-inbox [compact]="true" /> }
+        @if (canSeeApprovals) {
+          <div class="approvals-column">
+            @if (canApproveInvoices || canApproveCosts || canApprovePurchaseOrders) {
+              <section class="s2s-panel" aria-labelledby="finance-approvals-title">
+                <h2 id="finance-approvals-title">{{ 'dashboard.financeApprovals' | translate }}</h2>
+                <ul class="links">
+                  @if (canApproveInvoices) {
+                    <li><a routerLink="/finance/invoices"><span>{{ 'dashboard.invoicesAwaiting' | translate }}</span>
+                      <strong>{{ invoicesAwaiting() === 'error' ? ('dashboard.unavailable' | translate) : (invoicesAwaiting() ?? '…') }}</strong></a></li>
+                  }
+                  @if (canApproveCosts) {
+                    <li><a routerLink="/finance/vendor-bills"><span>{{ 'dashboard.costsAwaiting' | translate }}</span>
+                      <strong>{{ costsAwaiting() === 'error' ? ('dashboard.unavailable' | translate) : (costsAwaiting() ?? '…') }}</strong></a></li>
+                  }
+                  @if (canApprovePurchaseOrders) {
+                    <li><a routerLink="/finance/purchase-orders"><span>{{ 'dashboard.purchaseOrdersAwaiting' | translate }}</span>
+                      <strong>{{ purchaseOrdersAwaiting() === 'error' ? ('dashboard.unavailable' | translate) : (purchaseOrdersAwaiting() ?? '…') }}</strong></a></li>
+                  }
+                </ul>
+              </section>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (canReadLive) {
+      <section class="s2s-panel" aria-labelledby="live-title">
+        <div class="card-head">
+          <h2 id="live-title">{{ 'dashboard.liveOperations' | translate }}</h2>
+          <a routerLink="/operations">{{ 'dashboard.viewAll' | translate }}</a>
+        </div>
+        @switch (live()) {
+          @case (null) { <p class="muted">{{ 'dashboard.loading' | translate }}</p> }
+          @case ('error') { <p role="alert">{{ 'dashboard.loadFailed' | translate }}</p> }
+          @default {
+            <ul class="rows">
+              @for (job of $any(live()).items; track job.jobId) {
+                <li><a [routerLink]="['/jobs', job.jobId, 'operations']">
+                  <span class="row-main"><strong>{{ job.jobNumber }}</strong>
+                    <span class="muted">{{ job.motherVessel ?? '—' }} / {{ job.daughterVessel ?? '—' }}</span></span>
+                  <span class="row-side">
+                    @if (job.lastEventLabel) { <span>{{ job.lastEventLabel }} · {{ job.lastEventAt | utcDateTime }}</span> }
+                    @else { <span class="muted">{{ 'dashboard.noEvents' | translate }}</span> }
+                    @if (job.openIncidents) { <span class="chip warn">{{ 'dashboard.openIncidents' | translate: { count: job.openIncidents } }}</span> }
+                    <s2s-status-tag [status]="job.status" />
+                  </span>
+                </a></li>
+              } @empty {
+                <li class="muted">{{ 'dashboard.noJobs' | translate }}</li>
+              }
+            </ul>
+          }
+        }
+      </section>
+    }
+
+    @if (canReadInvoices) {
+      <section class="s2s-panel" aria-labelledby="finance-title">
+        <div class="card-head">
+          <h2 id="finance-title">{{ 'dashboard.financeOverview' | translate }}</h2>
+          <a routerLink="/finance/receivables">{{ 'dashboard.viewAll' | translate }}</a>
+        </div>
+        @switch (receivables()) {
+          @case (null) { <p class="muted">{{ 'dashboard.loading' | translate }}</p> }
+          @case ('error') { <p role="alert">{{ 'dashboard.loadFailed' | translate }}</p> }
+          @default {
+            <dl class="money">
+              @for (row of $any(receivables()); track row.currency) {
+                <div><dt>{{ 'dashboard.outstanding' | translate: { currency: row.currency } }}</dt><dd>{{ row.outstanding | money: null : row.minorUnits }}</dd></div>
+                <div [class.overdue]="row.hasOverdue"><dt>{{ 'dashboard.overdue' | translate: { currency: row.currency } }}</dt><dd>{{ row.overdue | money: null : row.minorUnits }}</dd></div>
+              } @empty {
+                <p class="muted">{{ 'dashboard.nothingOutstanding' | translate }}</p>
+              }
+            </dl>
+            @if (receivablesChart(); as chart) {
+              <div class="chart-block receivables-chart">
+                <h3>{{ 'dashboard.receivablesChart' | translate }}</h3>
+                @defer (on viewport) {
+                  <s2s-dashboard-chart [config]="chart.config" [summary]="chart.summary" />
+                } @placeholder {
+                  <div style="height:13rem" aria-hidden="true"></div>
+                }
+              </div>
+            }
+          }
+        }
+      </section>
+    }
+
+    @if (canReadProfitability) {
+      <section class="s2s-panel" aria-labelledby="profitability-title">
+        <div class="card-head">
+          <h2 id="profitability-title">{{ 'dashboard.recentProfitability' | translate }}</h2>
+          <a routerLink="/finance/profitability">{{ 'dashboard.viewAll' | translate }}</a>
+        </div>
+        @switch (profitability()) {
+          @case (null) { <p class="muted">{{ 'dashboard.loading' | translate }}</p> }
+          @case ('error') { <p role="alert">{{ 'dashboard.loadFailed' | translate }}</p> }
+          @default {
+            @if (marginChart(); as chart) {
+              <div class="chart-block margin-chart">
+                <h3>{{ 'dashboard.marginChart' | translate }}</h3>
+                @defer (on viewport) {
+                  <s2s-dashboard-chart [config]="chart.config" [summary]="chart.summary" />
+                } @placeholder {
+                  <div style="height:13rem" aria-hidden="true"></div>
+                }
+              </div>
+            }
+            <ul class="rows">
+              @for (job of $any(profitability()).items; track job.jobId) {
+                <li>
+                  <div class="row-main"><strong>{{ job.jobNumber }}</strong><span class="muted">{{ job.clientName ?? '—' }}</span></div>
+                  <div class="row-side">
+                    <span>{{ 'dashboard.margin' | translate }}: {{ job.currency }} {{ job.margin | money: null : job.minorUnits }}</span>
+                    @if (job.marginPercent !== null) { <span class="muted">({{ job.marginPercent }}%)</span> }
+                  </div>
+                </li>
+              } @empty {
+                <li class="muted">{{ 'dashboard.noProfitability' | translate }}</li>
+              }
+            </ul>
+          }
+        }
+      </section>
+    }
+  </div>
+}

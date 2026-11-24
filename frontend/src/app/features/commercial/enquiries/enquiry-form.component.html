@@ -1,0 +1,232 @@
+<s2s-page-header
+  [heading]="record()?.reference ?? ((draft() ? 'enquiry.draft' : 'enquiry.new') | translate)"
+  [subtitle]="record()?.client?.name">
+  @if (!record() && canWrite()) {
+    <p-button type="button" [label]="'enquiry.saveDraft' | translate" [outlined]="true" [loading]="saving()" (onClick)="saveDraft()" />
+  }
+  @if (record(); as current) {
+    <s2s-status-tag [status]="current.status" />
+    @if (canWrite()) {
+      @for (to of current.allowedTransitions; track to) {
+        <p-button
+          [label]="'enquiry.transition.' + to | translate"
+          [severity]="to === 'COSTING' ? 'primary' : 'secondary'"
+          [outlined]="to !== 'COSTING'"
+          (onClick)="startTransition(to)" />
+      }
+    }
+  }
+</s2s-page-header>
+
+@if (record(); as current) {
+  <s2s-enquiry-tabs [enquiryId]="current.id" />
+}
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" class="form-message">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+@if (record() && !record()!.editable) {
+  <p-message severity="info" class="form-message" [text]="'enquiry.readOnly' | translate" />
+}
+
+<form [formGroup]="form" (ngSubmit)="save()" novalidate [attr.aria-busy]="loading()" class="sections">
+  <section class="s2s-panel">
+    <h2>{{ 'enquiry.section.general' | translate }}</h2>
+    <div class="s2s-form-grid">
+      <s2s-form-field labelKey="masters.branch.single" fieldId="branchId" [control]="form.controls.branchId" [required]="true">
+        <p-select inputId="branchId" formControlName="branchId" [options]="branches()" optionLabel="label" optionValue="value" [placeholder]="(branchHint() ?? 'common.select') | translate" [emptyMessage]="branchHint() ? (branchHint()! | translate) : ''" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="enquiry.receivedAt" fieldId="receivedAt" [control]="form.controls.receivedAt" hintKey="enquiry.receivedAtHint">
+        <s2s-date-time-picker inputId="receivedAt" formControlName="receivedAt" />
+      </s2s-form-field>
+    </div>
+  </section>
+
+  <section class="s2s-panel">
+    <h2>{{ 'enquiry.section.client' | translate }}</h2>
+    <div class="s2s-form-grid">
+      <s2s-form-field labelKey="enquiry.client" fieldId="client" [control]="form.controls.client" hintKey="enquiry.searchHint">
+        <p-autocomplete
+          inputId="client"
+          formControlName="client"
+          [suggestions]="clientSuggestions()"
+          (completeMethod)="searchClients($event)"
+          optionLabel="label"
+          [forceSelection]="true"
+          [minLength]="2"
+          [delay]="0" />
+      </s2s-form-field>
+      @if (editable()) {
+        <p-button type="button" [label]="'enquiry.addClient' | translate" icon="pi pi-plus" [text]="true" size="small" (onClick)="quickAddClientVisible.set(true)" />
+      }
+      <div class="client-detail">
+        <label for="clientCountry">{{ 'masters.client.country' | translate }}</label>
+        <input pInputText id="clientCountry" [value]="clientCountry()" readonly />
+      </div>
+      <div class="client-detail">
+        <label for="clientPhone">{{ 'masters.client.phone' | translate }}</label>
+        <input pInputText id="clientPhone" [value]="clientPhone()" readonly />
+      </div>
+      <s2s-form-field labelKey="enquiry.contact" fieldId="clientContactId" [control]="form.controls.clientContactId">
+        <p-select inputId="clientContactId" formControlName="clientContactId" [options]="contactOptions()" optionLabel="label" optionValue="value" [showClear]="true" [placeholder]="(contactHint() ?? 'common.select') | translate" [emptyMessage]="contactHint() ? (contactHint()! | translate) : ''" />
+      </s2s-form-field>
+    </div>
+  </section>
+
+  <section class="s2s-panel">
+    <div class="section-head">
+      <h2>{{ 'enquiry.section.vessels' | translate }}</h2>
+    </div>
+    @if (duplicates().length) {
+      <p-message severity="warn" class="form-message">
+        <div>
+          <strong>{{ 'enquiry.duplicateWarning' | translate }}</strong>
+          <ul class="duplicates">
+            @for (dup of duplicates(); track dup.id) {
+              <li><a [routerLink]="['/commercial/enquiries', dup.id]">{{ dup.reference }}</a> · {{ 'status.' + dup.status | translate }} · {{ dup.clientName }}</li>
+            }
+          </ul>
+        </div>
+      </p-message>
+    }
+    <div class="vessels">
+      @for (role of ['mother', 'daughter']; track role) {
+        <div class="vessel" [formGroupName]="role">
+          <h3>{{ 'enquiry.' + role | translate }}</h3>
+          <s2s-form-field labelKey="enquiry.vessel" [fieldId]="role + '-vessel'" [control]="form.get(role + '.vessel')" hintKey="enquiry.searchVesselHint">
+            <p-autocomplete
+              [inputId]="role + '-vessel'"
+              formControlName="vessel"
+              [suggestions]="vesselSuggestions()"
+              (completeMethod)="searchVessels($event)"
+              optionLabel="label"
+              [forceSelection]="true"
+              [minLength]="2"
+              [delay]="0"
+              [showClear]="true" />
+          </s2s-form-field>
+          @if (editable() && canAddVessel()) {
+            <p-button [label]="'enquiry.addVessel' | translate" icon="pi pi-plus" [text]="true" size="small" (onClick)="quickAddFor.set($any(role))" />
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="s2s-panel">
+    <div class="section-head">
+      <h2>{{ 'enquiry.section.cargo' | translate }}</h2>
+      @if (editable() && cargoRows.length < maxCargo) {
+        <p-button [label]="'enquiry.addCargo' | translate" icon="pi pi-plus" [outlined]="true" size="small" (onClick)="addCargo()" />
+      }
+    </div>
+    <div class="cargo" formArrayName="cargo">
+      @for (row of cargoRows; track row; let i = $index) {
+        <div class="cargo-row" [formGroupName]="i">
+          <s2s-form-field labelKey="enquiry.grade" [fieldId]="'grade-' + i" [control]="row.controls.cargoGradeId">
+            <p-select [inputId]="'grade-' + i" formControlName="cargoGradeId" [options]="grades()" optionLabel="label" optionValue="value" [showClear]="true" [filter]="grades().length > 8" [placeholder]="'common.select' | translate" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="enquiry.quantity" [fieldId]="'qty-' + i" [control]="row.controls.quantity">
+            <p-inputnumber [inputId]="'qty-' + i" formControlName="quantity" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="3" [min]="0" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="enquiry.unit" [fieldId]="'unit-' + i" [control]="row.controls.unitId">
+            <p-select [inputId]="'unit-' + i" formControlName="unitId" [options]="units()" optionLabel="label" optionValue="value" [showClear]="true" [placeholder]="'common.select' | translate" />
+          </s2s-form-field>
+          @if (editable() && cargoRows.length > 1) {
+            <p-button class="remove" icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'enquiry.removeCargo' | translate" (onClick)="removeCargo(i)" />
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="s2s-panel">
+    <div class="section-head">
+      <h2>{{ 'enquiry.specialItems' | translate }}</h2>
+      @if (editable() && specialRows.length < 20) {
+        <p-button type="button" [label]="'enquiry.addSpecial' | translate" icon="pi pi-plus" [outlined]="true" size="small" (onClick)="addSpecial()" />
+      }
+    </div>
+    <div formArrayName="specialItems">
+      @for (row of specialRows; track row; let i = $index) {
+        <div class="cargo-row" [formGroupName]="i">
+          <s2s-form-field labelKey="enquiry.specialDescription" [fieldId]="'special-description-' + i" [control]="row.controls.description" [required]="true">
+            <input pInputText [id]="'special-description-' + i" formControlName="description" maxlength="300" />
+          </s2s-form-field>
+          <label><input type="checkbox" formControlName="paid" /> {{ 'enquiry.paid' | translate }}</label>
+          @if (row.controls.paid.value) {
+            <s2s-form-field labelKey="enquiry.salePriceUsd" [fieldId]="'special-price-' + i" [control]="row.controls.salePriceUsd" [required]="true">
+              <p-inputnumber [inputId]="'special-price-' + i" formControlName="salePriceUsd" mode="decimal" [min]="0.0001" [minFractionDigits]="2" [maxFractionDigits]="4" />
+            </s2s-form-field>
+          }
+          @if (editable()) {
+            <p-button type="button" icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'enquiry.removeSpecial' | translate" (onClick)="removeSpecial(i)" />
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="s2s-panel">
+    <h2>{{ 'enquiry.section.operation' | translate }}</h2>
+    <div class="s2s-form-grid">
+      <s2s-form-field labelKey="enquiry.cargoTypes" fieldId="cargoTypes" [control]="form.controls.cargoTypes">
+        <p-multiselect inputId="cargoTypes" formControlName="cargoTypes" [options]="operationOptions()" optionLabel="label" optionValue="value" display="chip" [placeholder]="'common.select' | translate" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="enquiry.duration" fieldId="expectedDurationHours" [control]="form.controls.expectedDurationHours" hintKey="enquiry.durationHint">
+        <p-select inputId="expectedDurationHours" formControlName="expectedDurationHours" [options]="durationOptions()" optionLabel="label" optionValue="value" [showClear]="true" [placeholder]="'common.select' | translate" />
+      </s2s-form-field>
+      <details class="s2s-span-2 s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="enquiry.sourceReference" fieldId="sourceReference" [control]="form.controls.sourceReference" hintKey="enquiry.sourceReferenceHint">
+          <input pInputText id="sourceReference" formControlName="sourceReference" maxlength="255" />
+        </s2s-form-field>
+      </details>
+    </div>
+    @if (editable()) {
+      <div class="s2s-actions">
+        <p-button type="submit" [label]="(record() ? 'common.save' : 'enquiry.register') | translate" icon="pi pi-check" [loading]="saving()" [disabled]="loading()" />
+      </div>
+    }
+  </section>
+</form>
+
+@if (record(); as current) {
+  <section class="s2s-panel">
+    <h2>{{ 'enquiry.history' | translate }}</h2>
+    <ol class="timeline">
+      @for (step of current.history; track $index) {
+        <li>
+          <s2s-status-tag [status]="step.toStatus" />
+          <time class="s2s-muted" [attr.datetime]="step.occurredAt">{{ step.occurredAt | utcDateTime }}</time>
+          @if (step.reason) {
+            <span class="reason">{{ step.reason }}</span>
+          }
+        </li>
+      }
+    </ol>
+    @if (canReadAudit()) {
+      <details class="audit">
+        <summary>{{ 'audit.history' | translate }}</summary>
+        <s2s-audit-trail entityType="ENQUIRY" [entityId]="current.id" [pageSize]="10" />
+      </details>
+    }
+  </section>
+}
+
+<s2s-vessel-quick-add [visible]="quickAddFor() !== null" (visibleChange)="!$event && quickAddFor.set(null)" (created)="vesselAdded($event)" />
+<s2s-client-quick-add [(visible)]="quickAddClientVisible" (created)="clientAdded($event)" />
+
+<s2s-reason-dialog
+  [visible]="pendingTransition() !== null"
+  (visibleChange)="closeTransition($event)"
+  [headerKey]="'enquiry.transition.' + (pendingTransition() ?? 'COSTING')"
+  [messageKey]="'enquiry.transitionHint.' + (pendingTransition() ?? 'COSTING')"
+  [reasonRequired]="reasonRequired(pendingTransition())"
+  [saving]="saving()"
+  (confirmed)="confirmTransition($event)" />

@@ -1,0 +1,175 @@
+<s2s-page-header [heading]="overview()?.jobNumber ?? ''" [subtitle]="'finalReport.title' | translate">
+  <p-button [label]="'finalReport.jobOverview' | translate" icon="pi pi-arrow-left" [text]="true" [routerLink]="['/jobs', jobId()]" />
+  @if (overview()?.canCreate && overview()!.revisions.length) {
+    <p-button [label]="'finalReport.newRevision' | translate" icon="pi pi-plus" [outlined]="true" [loading]="saving()" (onClick)="create()" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') { <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" /> }
+  </p-message>
+}
+
+@if (overview(); as o) {
+  @if (o.revisions.length === 0) {
+    <section class="s2s-panel empty">
+      <s2s-empty-state messageKey="finalReport.empty" icon="pi pi-file" />
+      @if (o.canCreate) { <p-button [label]="'finalReport.prepare' | translate" icon="pi pi-plus" [loading]="saving()" (onClick)="create()" /> }
+    </section>
+  } @else {
+    <ul class="revisions" [attr.aria-label]="'finalReport.revisions' | translate">
+      @for (r of o.revisions; track r.id) {
+        <li><button type="button" [class.active]="r.id === revision()?.id" [attr.aria-current]="r.id === revision()?.id ? 'true' : null" (click)="select(r.id)">
+          {{ 'finalReport.revisionLabel' | translate: { no: r.revisionNo } }} <s2s-status-tag [status]="r.status" /></button></li>
+      }
+    </ul>
+  }
+}
+
+@if (revision(); as r) {
+  <section class="s2s-panel">
+    <header class="head">
+      <div><h2>{{ r.reference }}</h2><p class="s2s-muted small">{{ 'finalReport.documentId' | translate: { id: r.documentId, v: r.templateVersion } }}</p></div>
+      <s2s-status-tag [status]="r.status" />
+    </header>
+    <div class="actions">
+      <a class="p-button p-button-outlined link-button" [href]="pdfUrl(r)" target="_blank" rel="noopener">
+        <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ (r.pdfSha256 ? 'finalReport.issuedPdf' : 'finalReport.draftPdf') | translate }}</a>
+      @if (editable()) { <p-button [label]="'common.save' | translate" icon="pi pi-check" [disabled]="!dirty()" [loading]="saving()" (onClick)="save()" /> }
+      @if (can().has('SUBMIT')) {
+        <p-button [label]="'finalReport.submit' | translate" icon="pi pi-send" [disabled]="dirty() || r.blockers.length > 0" [loading]="saving()" (onClick)="act('submit')" />
+      }
+      @if (can().has('APPROVE')) { <p-button [label]="'finalReport.approve' | translate" icon="pi pi-check-circle" (onClick)="dialog.set('approve')" /> }
+      @if (can().has('RETURN')) { <p-button [label]="'finalReport.return' | translate" icon="pi pi-undo" severity="danger" [outlined]="true" (onClick)="dialog.set('return')" /> }
+      @if (can().has('ISSUE')) { <p-button [label]="'finalReport.issue' | translate" icon="pi pi-verified" (onClick)="dialog.set('issue')" /> }
+    </div>
+    @if (editable() && dirty()) { <p class="s2s-muted small">{{ 'finalReport.saveFirst' | translate }}</p> }
+    @if (r.returnedReason && r.status === 'DRAFT') { <p-message severity="warn" [text]="'finalReport.returned' | translate: { reason: r.returnedReason }" /> }
+    @if (r.blockers.length) {
+      <div class="notice blockers" role="status"><strong>{{ 'finalReport.blockersTitle' | translate }}</strong>
+        <ul>@for (b of r.blockers; track b.code) {
+          <li>
+            @switch (b.code) {
+              @case ('summary') { <a [routerLink]="['/jobs', jobId(), 'final-report']" fragment="fr-summary">{{ b.message }}</a> }
+              @case ('attendance') { <a [routerLink]="['/jobs', jobId(), 'final-report']" fragment="fr-attendance">{{ b.message }}</a> }
+              @case ('cargo') { <a [routerLink]="['/jobs', jobId(), 'operations']" [queryParams]="{ tab: 'cargo' }">{{ b.message }}</a> }
+              @case ('sof') { <a [routerLink]="['/jobs', jobId(), 'operations']" [queryParams]="{ tab: 'sof' }">{{ b.message }}</a> }
+              @default { {{ b.message }} }
+            }
+          </li>
+        }</ul></div>
+    }
+    @if (r.warnings.length) {
+      <div class="notice"><strong>{{ 'finalReport.warningsTitle' | translate }}</strong>
+        <ul>@for (w of r.warnings; track w.code) { <li>{{ w.message }}</li> }</ul></div>
+    }
+    <ul class="trail">
+      @if (r.submittedAt) { <li>{{ 'finalReport.submittedBy' | translate: { name: r.submittedByName, at: (r.submittedAt | utcDateTime: zone()) } }}</li> }
+      @if (r.decidedAt) { <li>{{ 'finalReport.approvedBy' | translate: { name: r.decidedByName, at: (r.decidedAt | utcDateTime: zone()) } }}</li> }
+      @if (r.issuedAt) { <li>{{ 'finalReport.issuedBy' | translate: { name: r.issuedByName, at: (r.issuedAt | utcDateTime: zone()) } }}</li> }
+    </ul>
+    @if (r.pdfSha256) { <p class="hash s2s-muted">SHA-256: <code>{{ r.pdfSha256 }}</code></p> }
+  </section>
+
+  <!-- Job records -->
+  <section class="s2s-panel">
+    <header class="head"><h3>{{ 'finalReport.records' | translate }}</h3><p-tag [value]="'finalReport.fromRecords' | translate" severity="success" /></header>
+    <p class="s2s-muted small">{{ (r.snapshotFrozen ? 'finalReport.frozen' : 'finalReport.live') | translate: { at: (r.snapshot.takenAt | utcDateTime: zone()) } }}</p>
+    <dl class="facts">
+      <div><dt>{{ 'finalReport.client' | translate }}</dt><dd>{{ r.snapshot.client ?? '—' }}</dd></div>
+      @for (v of r.snapshot.vessels; track v.role) { <div><dt>{{ 'finalReport.role.' + v.role | translate }}</dt><dd>{{ v.name }} ({{ v.imo }})</dd></div> }
+      <div><dt>{{ 'finalReport.q88' | translate }}</dt>
+        <dd>@for (q of r.snapshot.q88; track $index) { {{ q.vessel }}: {{ q.documentName }}<br /> } @empty { {{ 'finalReport.noQ88' | translate }} }</dd></div>
+      <div><dt>{{ 'finalReport.cargo' | translate }}</dt>
+        <dd>@for (g of r.snapshot.grades; track $index) { {{ g.gradeName }}: {{ g.finalQuantity ?? '—' }} / {{ g.planned }} {{ g.unit }}
+          @if (g.completed) { <p-tag [value]="'finalReport.final' | translate" severity="success" /> }<br /> }</dd></div>
+      <div><dt>{{ 'finalReport.events' | translate }}</dt><dd>{{ 'finalReport.eventCount' | translate: { count: r.snapshot.events.length } }}</dd></div>
+      <div><dt>{{ 'finalReport.incidentsDelays' | translate }}</dt>
+        <dd>{{ 'finalReport.incidentCount' | translate: { incidents: r.snapshot.incidents.length, delays: r.snapshot.delays.length } }}</dd></div>
+      <div><dt>{{ 'finalReport.sof' | translate }}</dt>
+        <dd>@if (r.snapshot.sof; as s) { {{ 'finalReport.sofIssued' | translate: { no: s.revisionNo, at: (s.issuedAt | utcDateTime: zone()) } }} } @else { {{ 'finalReport.noSof' | translate }} }</dd></div>
+    </dl>
+  </section>
+
+  <!-- Entered on the report -->
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate class="s2s-panel entries">
+    <h3>{{ 'finalReport.entries' | translate }}</h3>
+    <s2s-form-field labelKey="finalReport.vhf" fieldId="fr-vhf" [control]="form.controls.vhfChannel">
+      <input pInputText id="fr-vhf" formControlName="vhfChannel" maxlength="50" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="finalReport.summary" fieldId="fr-summary" [control]="form.controls.summary" [required]="true" hintKey="finalReport.summaryHint">
+      <textarea pTextarea id="fr-summary" formControlName="summary" rows="8" maxlength="8000" [autoResize]="true"></textarea>
+    </s2s-form-field>
+    @if (editable()) {
+      <p-button [label]="'finalReport.regenerate' | translate" icon="pi pi-refresh" [text]="true" size="small" [disabled]="dirty()" (onClick)="act('regenerate-summary')" />
+    }
+
+    <header class="head sub"><h4>{{ 'finalReport.equipment' | translate }}</h4><p-tag [value]="'finalReport.manual' | translate" severity="warn" /></header>
+    <p class="s2s-muted small">{{ 'finalReport.manualHint' | translate }}</p>
+    <div formArrayName="equipment" class="rows">
+      @for (row of form.controls.equipment.controls; track row; let i = $index) {
+        <div class="row-card" [formGroupName]="i">
+          <s2s-form-field labelKey="finalReport.type" [fieldId]="'eq-c-' + i" [control]="row.controls.category">
+            <p-select [inputId]="'eq-c-' + i" formControlName="category" [options]="categoryOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="finalReport.description" [fieldId]="'eq-d-' + i" [control]="row.controls.description" [required]="true">
+            <input pInputText [id]="'eq-d-' + i" formControlName="description" maxlength="200" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="finalReport.units" [fieldId]="'eq-q-' + i" [control]="row.controls.quantity">
+            <input pInputText [id]="'eq-q-' + i" type="number" formControlName="quantity" min="0" max="999" />
+          </s2s-form-field>
+          @if (editable()) { <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="remove(form.controls.equipment, i)" /> }
+        </div>
+      }
+    </div>
+    @if (editable()) { <p-button [label]="'finalReport.addEquipment' | translate" icon="pi pi-plus" [text]="true" (onClick)="addEquipment()" /> }
+
+    <header id="fr-attendance" class="head sub"><h4>{{ 'finalReport.attendance' | translate }}</h4><p-tag [value]="'finalReport.manual' | translate" severity="warn" /></header>
+    <div formArrayName="attendance" class="rows">
+      @for (row of form.controls.attendance.controls; track row; let i = $index) {
+        <div class="row-card" [formGroupName]="i">
+          <s2s-form-field labelKey="finalReport.capacity" [fieldId]="'at-c-' + i" [control]="row.controls.capacity" [required]="true">
+            <input pInputText [id]="'at-c-' + i" formControlName="capacity" maxlength="100" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="finalReport.name" [fieldId]="'at-n-' + i" [control]="row.controls.name" [required]="true">
+            <input pInputText [id]="'at-n-' + i" formControlName="name" maxlength="150" />
+          </s2s-form-field>
+          @if (editable()) { <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="remove(form.controls.attendance, i)" /> }
+        </div>
+      }
+    </div>
+    @if (editable()) { <p-button [label]="'finalReport.addAttendance' | translate" icon="pi pi-plus" [text]="true" (onClick)="addAttendance()" /> }
+
+    <details class="s2s-optional-details">
+      <summary>{{ 'common.moreDetails' | translate }}</summary>
+      <s2s-form-field labelKey="finalReport.remarks" fieldId="fr-remarks" [control]="form.controls.remarks">
+        <textarea pTextarea id="fr-remarks" formControlName="remarks" rows="4" maxlength="8000" [autoResize]="true"></textarea>
+      </s2s-form-field>
+    </details>
+    <s2s-form-field labelKey="finalReport.attachments" fieldId="fr-attach" [control]="form.controls.attachmentDocumentIds" hintKey="finalReport.attachmentsHint">
+      <p-multiselect inputId="fr-attach" formControlName="attachmentDocumentIds" [options]="documentOptions()" optionLabel="label" optionValue="value"
+        appendTo="body" [filter]="true" display="chip" [placeholder]="'finalReport.chooseDocuments' | translate" />
+    </s2s-form-field>
+  </form>
+}
+
+<p-dialog [header]="'finalReport.approve' | translate" [visible]="dialog() === 'approve'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'finalReport.approveHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'finalReport.approve' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="decide('APPROVE', null)" />
+  </ng-template>
+</p-dialog>
+<p-dialog [header]="'finalReport.issue' | translate" [visible]="dialog() === 'issue'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'finalReport.issueHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'finalReport.issue' | translate" icon="pi pi-verified" [loading]="saving()" (onClick)="act('issue')" />
+  </ng-template>
+</p-dialog>
+<s2s-reason-dialog [visible]="dialog() === 'return'" (visibleChange)="closeDialog($event)" headerKey="finalReport.return" messageKey="finalReport.returnHint"
+  confirmKey="finalReport.return" [reasonRequired]="true" [saving]="saving()" (confirmed)="decide('RETURN', $event)" />

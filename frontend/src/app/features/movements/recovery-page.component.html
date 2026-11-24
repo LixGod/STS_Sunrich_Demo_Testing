@@ -1,0 +1,44 @@
+<s2s-page-header [heading]="'movements.recovery' | translate" [subtitle]="context()?.jobNumber ?? ''">
+  <a [routerLink]="['/jobs', jobId(), 'movements']">{{ 'movements.title' | translate }}</a>
+</s2s-page-header>
+@if (errorKey(); as error) { <p-message severity="error" role="alert" [text]="error | translate" /> }
+@if (data(); as r) {
+  <p>{{ 'movements.zone' | translate: { zone: context()?.timeZone } }}</p>
+  <section class="s2s-panel">
+    <h2>{{ 'movements.disembark' | translate }}</h2>
+    <p>{{ display(r.disembarkedAt) }} · {{ r.status }}</p>
+    @if (canWrite() && r.status === 'OPEN') { <div class="fields compact">
+      <div><label for="disembark-time">{{ 'movements.disembarkTime' | translate }}</label>
+        <s2s-date-time-picker inputId="disembark-time" [(ngModel)]="disembarkLocal" [localString]="true" /></div>
+      <button type="button" (click)="disembark()" [disabled]="busy() || !disembarkLocal || !!r.disembarkedAt && !reason.trim()">{{ 'common.save' | translate }}</button>
+    </div> }
+  </section>
+  <section class="s2s-panel">
+    <h2>{{ 'movements.reconciliation' | translate }}</h2>
+    @if (r.unresolved.length) { <p-message severity="warn" [text]="'movements.discrepancy' | translate: { count: r.unresolved.length }" /> }
+    <div class="cards">@for (a of r.assets; track a.allocationId) { <article class="card">
+      <h3>{{ a.identifier }} · {{ a.category }}</h3>
+      <p>{{ 'movements.returnStatus' | translate }}: {{ a.status }}</p>
+      @if (a.notes) { <p>{{ a.notes }}</p> }
+      @if (a.resolutionReason) { <p>{{ 'movements.resolved' | translate }}: {{ a.resolutionReason }}</p> }
+      @if (a.fileId) { <p>{{ 'movements.evidence' | translate }}: {{ a.fileId }}</p> }
+      @if (canWrite() && r.status === 'OPEN') { <div class="fields">
+        <label>{{ 'movements.returnStatus' | translate }}<select [(ngModel)]="drafts[a.allocationId].status">
+          <option value="RETURNED">{{ 'movements.RETURNED' | translate }}</option>
+          <option value="DAMAGED">{{ 'movements.DAMAGED' | translate }}</option>
+          <option value="SHORT">{{ 'movements.SHORT' | translate }}</option>
+        </select></label>
+        <label>{{ 'movements.notes' | translate }}<textarea rows="2" [(ngModel)]="drafts[a.allocationId].notes"></textarea></label>
+        <button type="button" (click)="record(a)" [disabled]="busy() || a.status !== 'UNRECORDED' && !reason.trim()">{{ 'common.save' | translate }}</button>
+        @if (a.status !== 'UNRECORDED') { <label>{{ 'movements.evidence' | translate }}
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="file(a, $event)" /></label> }
+      </div> }
+      @if (canApprove() && r.status === 'OPEN' && (a.status === 'DAMAGED' || a.status === 'SHORT') && !a.resolutionReason) {
+        <button type="button" (click)="resolve(a)" [disabled]="!reason.trim()">{{ 'movements.resolve' | translate }}</button>
+      }
+    </article> } @empty { <p>{{ 'movements.noAssets' | translate }}</p> }</div>
+    @if (canWrite() || canApprove()) { <label>{{ 'movements.reason' | translate }}<textarea rows="2" [(ngModel)]="reason"></textarea></label> }
+    @if (canApprove() && r.status === 'OPEN') { <button type="button" (click)="close()" [disabled]="busy() || !r.disembarkedAt || r.unresolved.length > 0">
+      {{ 'movements.closeRecovery' | translate }}</button> }
+  </section>
+}

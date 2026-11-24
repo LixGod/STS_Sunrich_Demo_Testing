@@ -1,0 +1,23 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  min-width: 0;
+}
+
+label {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+}
+
+.required {
+  color: #b42318;
+  margin-left: 0.125rem;
+}
+
+.hint {
+  color: var(--s2s-text-muted);
+  font-size: 0.8125rem;
+}

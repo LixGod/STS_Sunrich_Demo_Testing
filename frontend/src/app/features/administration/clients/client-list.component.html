@@ -1,0 +1,12 @@
+<s2s-page-header [heading]="'nav.clients' | translate" [subtitle]="'masters.client.subtitle' | translate">
+  <p-button *s2sCan="permissions.masterCommercialWrite" [label]="'common.add' | translate" icon="pi pi-plus" routerLink="new" />
+</s2s-page-header>
+
+<section class="s2s-panel">
+  <s2s-data-table [columns]="columns" [load]="load" [params]="params()" [actions]="actions" defaultSort="legalName,asc" captionKey="nav.clients">
+    <s2s-active-filter tableToolbar [(value)]="active" />
+    <p-select tableToolbar [options]="roleOptions()" optionLabel="label" optionValue="value" [showClear]="true"
+      [placeholder]="'masters.client.roles' | translate" [ariaLabel]="'masters.client.roles' | translate"
+      [ngModel]="role()" (ngModelChange)="role.set($event ?? null)" />
+  </s2s-data-table>
+</section>

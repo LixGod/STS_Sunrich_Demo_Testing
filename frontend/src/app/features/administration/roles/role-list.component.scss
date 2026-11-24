@@ -1,0 +1,34 @@
+.roles {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+p {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.875rem;
+}
+
+code {
+  font-size: 0.75rem;
+  background: var(--s2s-bg);
+  padding: 0 0.25rem;
+  border-radius: 3px;
+}
+
+.role-action { margin: 0 0 1rem; }
+.editor { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
+.editor input:not([type='checkbox']), .editor textarea { width: 100%; max-width: 32rem; padding: 0.5rem; }
+.editor fieldset { border: 1px solid var(--s2s-border); }
+.permission { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.3rem 0; }
+.actions { display: flex; gap: 0.5rem; }

@@ -1,0 +1,180 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+h2,
+h3,
+h4 {
+  margin: 0;
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+h3 {
+  font-size: 0.95rem;
+}
+
+h4 {
+  font-size: 0.85rem;
+}
+
+.small {
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.revisions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+
+  button {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--s2s-border);
+    border-radius: var(--s2s-radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &.active {
+      border-color: var(--p-primary-color);
+    }
+  }
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  &.sub {
+    margin-top: 1rem;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+}
+
+.notice {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+
+  ul {
+    margin: 0.3rem 0 0;
+    padding-left: 1.1rem;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.15rem;
+  }
+
+  &.blockers {
+    border-color: var(--p-orange-300, #fdba74);
+    background: var(--p-orange-50, #fff7ed);
+  }
+}
+
+.trail {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.hash {
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  display: grid;
+  gap: 0.5rem 1.5rem;
+  margin: 0.5rem 0 0;
+
+  @media (min-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  > * {
+    min-width: 0;
+  }
+
+  dt {
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.row-card {
+  display: grid;
+  gap: 0 0.75rem;
+  align-items: end;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+
+  > * {
+    min-width: 0;
+  }
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+}
+
+:host ::ng-deep :is(.entries) :is(.p-select, .p-inputtext, .p-textarea, .p-multiselect) {
+  width: 100%;
+}

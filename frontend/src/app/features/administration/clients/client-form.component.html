@@ -1,0 +1,201 @@
+<s2s-page-header [heading]="record()?.legalName ?? ('masters.client.new' | translate)" [subtitle]="record()?.code" [backLink]="listRoute">
+  @if (record(); as client) {
+    <s2s-status-tag [active]="client.active" />
+    @if (canWrite()) {
+      <p-button
+        [label]="(client.active ? 'common.deactivate' : 'common.activate') | translate"
+        [severity]="client.active ? 'secondary' : 'success'"
+        [outlined]="true"
+        (onClick)="changeStatus(null)" />
+      <p-button
+        [label]="'common.delete' | translate"
+        icon="pi pi-trash"
+        severity="danger"
+        [outlined]="true"
+        [loading]="saving()"
+        (onClick)="confirmDelete()" />
+    }
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" class="form-message">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+
+<form class="s2s-panel" [formGroup]="form" (ngSubmit)="save()" novalidate [attr.aria-busy]="loading()">
+  <div class="s2s-form-grid">
+    <s2s-form-field labelKey="masters.code" fieldId="code" [control]="form.controls.code" [required]="true" hintKey="masters.codeHint">
+      <input pInputText id="code" formControlName="code" maxlength="20" autocapitalize="characters" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.legalName" fieldId="legalName" [control]="form.controls.legalName" [required]="true">
+      <input pInputText id="legalName" formControlName="legalName" maxlength="200" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.roles" fieldId="roles" [control]="form.controls.roles" [required]="true">
+      <p-multiselect inputId="roles" formControlName="roles" [options]="roleOptions()" optionLabel="label" optionValue="value" display="chip" [placeholder]="'common.select' | translate" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.defaultCurrency" fieldId="defaultCurrency" [control]="form.controls.defaultCurrency">
+      <p-select inputId="defaultCurrency" formControlName="defaultCurrency" [options]="currencies()" optionLabel="label" optionValue="value" [filter]="true" filterBy="label" [showClear]="true" [placeholder]="'common.select' | translate" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.taxRegistrationNo" fieldId="taxRegistrationNo" [control]="form.controls.taxRegistrationNo">
+      <input pInputText id="taxRegistrationNo" formControlName="taxRegistrationNo" maxlength="50" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.country" fieldId="countryCode" [control]="form.controls.countryCode">
+      <p-select inputId="countryCode" formControlName="countryCode" [options]="countries" optionLabel="label" optionValue="code" [filter]="true" filterBy="label,code" [showClear]="true" [placeholder]="'common.select' | translate" />
+    </s2s-form-field>
+    <div class="s2s-span-2 channel-group" formArrayName="emails">
+      <div class="section-head">
+        <h3>{{ 'masters.client.emails' | translate }}</h3>
+        @if (canWrite() && form.controls.emails.length < 10) {
+          <p-button type="button" [label]="'masters.client.addEmail' | translate" icon="pi pi-plus" [outlined]="true" size="small" (onClick)="addEmail()" />
+        }
+      </div>
+      @for (control of form.controls.emails.controls; track control; let i = $index) {
+        <div class="channel-row">
+          <s2s-form-field labelKey="masters.client.email" [fieldId]="'client-email-' + i" [control]="control">
+            <input pInputText [id]="'client-email-' + i" [attr.name]="'email-' + i" [formControlName]="i" type="email" autocomplete="email" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="254" />
+          </s2s-form-field>
+          @if (i === 0) { <span class="s2s-muted">{{ 'masters.client.primaryValue' | translate }}</span> }
+          @if (canWrite()) {
+            <div class="channel-actions">
+              <p-button type="button" icon="pi pi-arrow-up" [text]="true" [disabled]="i === 0" [ariaLabel]="'masters.client.moveUp' | translate" (onClick)="moveEmail(i, -1)" />
+              <p-button type="button" icon="pi pi-arrow-down" [text]="true" [disabled]="i === form.controls.emails.length - 1" [ariaLabel]="'masters.client.moveDown' | translate" (onClick)="moveEmail(i, 1)" />
+              <p-button type="button" icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="removeEmail(i)" />
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <div class="s2s-span-2 channel-group" formArrayName="phones">
+      <div class="section-head">
+        <h3>{{ 'masters.client.phones' | translate }}</h3>
+        @if (canWrite() && form.controls.phones.length < 10) {
+          <p-button type="button" [label]="'masters.client.addPhone' | translate" icon="pi pi-plus" [outlined]="true" size="small" (onClick)="addPhone()" />
+        }
+      </div>
+      @for (control of form.controls.phones.controls; track control; let i = $index) {
+        <div class="channel-row">
+          <s2s-form-field labelKey="masters.client.phone" [fieldId]="'client-phone-' + i" [control]="control">
+            <input pInputText [id]="'client-phone-' + i" [attr.name]="'phone-' + i" [formControlName]="i" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" />
+          </s2s-form-field>
+          @if (i === 0) { <span class="s2s-muted">{{ 'masters.client.primaryValue' | translate }}</span> }
+          @if (canWrite()) {
+            <div class="channel-actions">
+              <p-button type="button" icon="pi pi-arrow-up" [text]="true" [disabled]="i === 0" [ariaLabel]="'masters.client.moveUp' | translate" (onClick)="movePhone(i, -1)" />
+              <p-button type="button" icon="pi pi-arrow-down" [text]="true" [disabled]="i === form.controls.phones.length - 1" [ariaLabel]="'masters.client.moveDown' | translate" (onClick)="movePhone(i, 1)" />
+              <p-button type="button" icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="removePhone(i)" />
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <s2s-form-field class="s2s-span-2" labelKey="masters.client.billingAddress" fieldId="billingAddress" [control]="form.controls.billingAddress">
+      <textarea pTextarea id="billingAddress" formControlName="billingAddress" rows="2" maxlength="500"></textarea>
+    </s2s-form-field>
+    <s2s-form-field class="s2s-span-2" labelKey="masters.client.paymentTerms" fieldId="paymentTerms" [control]="form.controls.paymentTerms">
+      <textarea pTextarea id="paymentTerms" formControlName="paymentTerms" rows="2" maxlength="500"></textarea>
+    </s2s-form-field>
+  </div>
+  @if (canWrite()) {
+    <div class="s2s-actions">
+      <p-button type="submit" [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" [disabled]="loading()" />
+    </div>
+  }
+</form>
+
+@if (record()) {
+  <section class="s2s-panel contacts">
+    <div class="section-head">
+      <h2>{{ 'masters.client.contacts' | translate }}</h2>
+      @if (canWrite()) {
+        <p-button [label]="'masters.client.addContact' | translate" icon="pi pi-plus" [outlined]="true" size="small" (onClick)="openContact(null)" />
+      }
+    </div>
+    <ul class="contact-list">
+      @for (contact of contacts(); track contact.id) {
+        <li [class.inactive]="!contact.active">
+          <div class="contact-main">
+            <strong>{{ contact.fullName }}</strong>
+            @if (contact.primary) {
+              <span class="primary">{{ 'masters.client.primary' | translate }}</span>
+            }
+            <span class="s2s-muted">{{ contact.position }}</span>
+          </div>
+          <div class="contact-meta s2s-muted">
+            @if (contact.email) { <span>{{ contact.email }}</span> }
+            @if (contact.phone) { <span>{{ contact.phone }}</span> }
+            @if (!contact.active) { <s2s-status-tag [active]="false" /> }
+          </div>
+          <div class="contact-actions">
+            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="secondary" [ariaLabel]="'common.edit' | translate" (onClick)="openContact(contact)" />
+            @if (canWrite()) {
+              <p-button
+                [icon]="contact.active ? 'pi pi-ban' : 'pi pi-replay'"
+                [text]="true"
+                [rounded]="true"
+                severity="secondary"
+                [ariaLabel]="(contact.active ? 'common.deactivate' : 'common.activate') | translate"
+                (onClick)="toggleContact(contact)" />
+              <p-button
+                icon="pi pi-trash"
+                [text]="true"
+                [rounded]="true"
+                severity="danger"
+                [ariaLabel]="'common.delete' | translate"
+                (onClick)="confirmDeleteContact(contact)" />
+            }
+          </div>
+        </li>
+      } @empty {
+        <li class="s2s-muted">{{ 'masters.client.noContacts' | translate }}</li>
+      }
+    </ul>
+  </section>
+
+  @if (canReadAudit()) {
+    <section class="s2s-panel">
+      <h2>{{ 'audit.history' | translate }}</h2>
+      <s2s-audit-trail entityType="CLIENT" [entityId]="record()!.id" />
+    </section>
+  }
+}
+
+<p-dialog
+  [(visible)]="contactDialog"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: 'min(34rem, 96vw)' }"
+  [breakpoints]="{ '640px': '100vw' }"
+  [header]="(editingContact() ? 'masters.client.editContact' : 'masters.client.addContact') | translate">
+  @if (contactError(); as key) {
+    <p-message severity="error" role="alert" [text]="key | translate" />
+  }
+  <form [formGroup]="contactForm" (ngSubmit)="saveContact()" novalidate id="contact-form">
+    <s2s-form-field labelKey="masters.client.contactName" fieldId="contactName" [control]="contactForm.controls.fullName" [required]="true">
+      <input pInputText id="contactName" formControlName="fullName" maxlength="150" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.position" fieldId="contactPosition" [control]="contactForm.controls.position">
+      <input pInputText id="contactPosition" formControlName="position" maxlength="100" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.email" fieldId="contactEmail" [control]="contactForm.controls.email">
+      <input pInputText id="contactEmail" type="email" formControlName="email" maxlength="254" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="masters.client.phone" fieldId="contactPhone" [control]="contactForm.controls.phone">
+      <input pInputText id="contactPhone" type="tel" formControlName="phone" maxlength="40" />
+    </s2s-form-field>
+    <div class="checkbox">
+      <p-checkbox inputId="contactPrimary" formControlName="primary" [binary]="true" />
+      <label for="contactPrimary">{{ 'masters.client.makePrimary' | translate }}</label>
+    </div>
+  </form>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="contactDialog.set(false)" />
+    @if (canWrite()) {
+      <p-button (onClick)="saveContact()" [label]="'common.save' | translate" icon="pi pi-check" [loading]="contactSaving()" />
+    }
+  </ng-template>
+</p-dialog>

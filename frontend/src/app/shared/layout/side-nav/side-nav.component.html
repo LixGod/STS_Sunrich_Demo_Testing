@@ -1,0 +1,64 @@
+<nav [attr.aria-label]="'nav.main' | translate">
+  @for (group of availableGroups(); track group.id) {
+    <details class="group" [open]="group.id === 'dashboard'">
+      <summary class="group-title">
+        <i [class]="group.icon" aria-hidden="true"></i>
+        {{ group.labelKey | translate }}
+        <i class="pi pi-chevron-down chevron" aria-hidden="true"></i>
+      </summary>
+      @if (group.items.length) {
+        <ul>
+          @for (item of group.items; track item.route) {
+            <li>
+              <a class="link" [routerLink]="item.route" routerLinkActive="active"
+                [routerLinkActiveOptions]="{ paths: item.route === '/operations' ? 'exact' : 'subset', queryParams: 'subset', matrixParams: 'subset', fragment: 'ignored' }"
+                ariaCurrentWhenActive="page" (click)="navigated.emit()">
+                {{ item.labelKey | translate }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+      @for (section of group.sections ?? []; track section.labelKey) {
+        <details class="subgroup">
+          <summary>
+            <span>{{ section.labelKey | translate }}</span>
+            <i class="pi pi-chevron-down chevron" aria-hidden="true"></i>
+          </summary>
+          <ul>
+            @for (item of section.items; track item.route) {
+              <li>
+                <a class="link" [routerLink]="item.route" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="navigated.emit()">
+                  {{ item.labelKey | translate }}
+                </a>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    </details>
+  }
+
+  @if (plannedGroups().length) {
+    <details class="planned" [open]="plannedOpen()" (toggle)="onPlannedToggle($event)">
+      <summary>
+        <i class="pi pi-clock" aria-hidden="true"></i>
+        <span>{{ 'nav.plannedModules' | translate }}</span>
+        <i class="pi pi-chevron-down chevron" aria-hidden="true"></i>
+      </summary>
+      <ul class="planned-list">
+        @for (group of plannedGroups(); track group.id) {
+          <li>
+            <a class="planned-link" [routerLink]="['/coming-soon', group.id]" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="navigated.emit()">
+              <i [class]="group.icon" aria-hidden="true"></i>
+              <span class="planned-copy">
+                <span>{{ group.labelKey | translate }}</span>
+                <small>{{ 'nav.comingInPhase' | translate: { phase: group.phase } }}</small>
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+    </details>
+  }
+</nav>

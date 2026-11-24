@@ -1,0 +1,319 @@
+<s2s-page-header [heading]="weather()?.jobNumber ?? limits()?.jobNumber ?? ''" [subtitle]="'weather.title' | translate">
+  <p-button [label]="'jpo.backToTechnical' | translate" icon="pi pi-arrow-left" [text]="true" [routerLink]="['/jobs', jobId(), 'technical']" />
+  @if (canReadJpo()) {
+    <p-button [label]="'job.jpoLink' | translate" icon="pi pi-map" [text]="true" [routerLink]="['/jobs', jobId(), 'jpo']" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+
+<!-- Operating limits -->
+<section class="s2s-panel limits" aria-labelledby="limits-title">
+  <header class="section-head">
+    <h2 id="limits-title">{{ 'weather.limitsTitle' | translate }}</h2>
+    @if (limits()?.canCreate && limits()!.revisions.length) {
+      <p-button [label]="'weather.newRevision' | translate" icon="pi pi-plus" [outlined]="true" size="small" [loading]="saving()" (onClick)="createLimits()" />
+    }
+  </header>
+  <p class="s2s-muted hint">{{ 'weather.limitsHint' | translate }}</p>
+
+  @if (limits(); as overview) {
+    @if (overview.revisions.length === 0) {
+      <s2s-empty-state messageKey="weather.noLimits" icon="pi pi-sliders-h" />
+      @if (overview.canCreate) {
+        <p-button [label]="'weather.prepareLimits' | translate" icon="pi pi-plus" [loading]="saving()" (onClick)="createLimits()" />
+      }
+    } @else {
+      <ul class="revisions" [attr.aria-label]="'weather.revisions' | translate">
+        @for (r of overview.revisions; track r.id) {
+          <li>
+            <button type="button" [class.active]="r.id === limitSet()?.id" [attr.aria-current]="r.id === limitSet()?.id ? 'true' : null" (click)="selectLimits(r.id)">
+              {{ 'weather.revisionLabel' | translate: { no: r.revisionNo } }} <s2s-status-tag [status]="r.status" />
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  }
+
+  @if (limitSet(); as set) {
+    <div class="actions">
+      @if (editable()) {
+        <p-button [label]="'common.save' | translate" icon="pi pi-check" [disabled]="!dirty()" [loading]="saving()" (onClick)="saveLimits()" />
+      }
+      @if (can().has('SUBMIT')) {
+        <p-button [label]="'weather.submitLimits' | translate" icon="pi pi-send" [disabled]="dirty() || set.rows.length === 0" [loading]="saving()"
+          (onClick)="submitLimits()" />
+      }
+      @if (can().has('APPROVE')) {
+        <p-button [label]="'weather.approve' | translate" icon="pi pi-check-circle" (onClick)="dialog.set('approve')" />
+      }
+      @if (can().has('RETURN')) {
+        <p-button [label]="'weather.return' | translate" icon="pi pi-undo" severity="danger" [outlined]="true" (onClick)="dialog.set('return')" />
+      }
+    </div>
+    @if (editable() && dirty()) {
+      <p class="s2s-muted hint">{{ 'weather.saveFirst' | translate }}</p>
+    }
+    @if (set.status === 'SUBMITTED' && can().has('RETURN') && !can().has('APPROVE')) {
+      <p class="s2s-muted hint">{{ 'weather.ownSubmission' | translate }}</p>
+    }
+    @if (set.returnedReason && set.status === 'DRAFT') {
+      <p-message severity="warn" [text]="'weather.returned' | translate: { reason: set.returnedReason }" />
+    }
+
+    <form [formGroup]="limitForm" (ngSubmit)="saveLimits()" novalidate>
+      <div formArrayName="rows" class="rows">
+        @for (row of limitForm.controls.rows.controls; track row; let i = $index) {
+          <div class="row-card limit-row" [formGroupName]="i">
+            <s2s-form-field labelKey="weather.parameter" [fieldId]="'lim-p-' + i" [control]="row.controls.parameterCode" [required]="true">
+              <p-select [inputId]="'lim-p-' + i" formControlName="parameterCode" [options]="parameterOptions()" optionLabel="label" optionValue="value"
+                appendTo="body" [placeholder]="'common.select' | translate" />
+            </s2s-form-field>
+            <s2s-form-field labelKey="weather.operation" [fieldId]="'lim-o-' + i" [control]="row.controls.operation" [required]="true">
+              <input pInputText [id]="'lim-o-' + i" formControlName="operation" maxlength="100" [placeholder]="'weather.operationHint' | translate" />
+            </s2s-form-field>
+            <s2s-form-field labelKey="weather.warnWhen" [fieldId]="'lim-c-' + i" [control]="row.controls.comparison">
+              <p-select [inputId]="'lim-c-' + i" formControlName="comparison" [options]="comparisonOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+            </s2s-form-field>
+            <s2s-form-field labelKey="weather.threshold" [fieldId]="'lim-t-' + i" [control]="row.controls.threshold" [required]="true">
+              <div class="with-unit">
+                <input pInputText [id]="'lim-t-' + i" formControlName="threshold" inputmode="decimal" />
+                <span class="unit">{{ unitOf(row.controls.parameterCode.value) }}</span>
+              </div>
+            </s2s-form-field>
+            <s2s-form-field labelKey="weather.action" [fieldId]="'lim-a-' + i" [control]="row.controls.action" [required]="true">
+              <input pInputText [id]="'lim-a-' + i" formControlName="action" maxlength="300" />
+            </s2s-form-field>
+            @if (editable()) {
+              <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="removeLimit(i)" />
+            }
+          </div>
+        } @empty {
+          <p class="s2s-muted">{{ 'weather.noRows' | translate }}</p>
+        }
+      </div>
+    </form>
+    @if (editable()) {
+      <p-button [label]="'weather.addLimit' | translate" icon="pi pi-plus" [text]="true" (onClick)="addLimit()" />
+    }
+
+    <ul class="trail">
+      @if (set.submittedAt) {
+        <li>{{ 'jpo.submittedBy' | translate: { name: set.submittedByName, at: (set.submittedAt | utcDateTime: timezone()) } }}</li>
+      }
+      @if (set.decidedAt) {
+        <li>{{ 'jpo.approvedBy' | translate: { name: set.decidedByName, at: (set.decidedAt | utcDateTime: timezone()) } }}</li>
+      }
+    </ul>
+  }
+</section>
+
+<!-- Warnings -->
+@if (weather(); as w) {
+  <section class="s2s-panel" aria-labelledby="warnings-title">
+    <h2 id="warnings-title">{{ 'weather.warningsTitle' | translate }}</h2>
+    @if (!w.limitsApproved) {
+      <p-message severity="info" [text]="'weather.noApprovedLimits' | translate" />
+    } @else if (w.warnings.length === 0) {
+      <p class="s2s-muted">{{ 'weather.noWarnings' | translate }}</p>
+    } @else {
+      <ul class="warnings" role="list">
+        @for (warning of w.warnings; track $index) {
+          <li>
+            <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+            <span>{{ 'weather.warning' | translate: warningParams(warning, (warning.at | utcDateTime: w.timezone)) }}</span>
+            @if (warning.reportStatus === 'RECORDED') { <p-tag [value]="'weather.notReviewed' | translate" severity="secondary" /> }
+          </li>
+        }
+      </ul>
+      <p class="s2s-muted hint">{{ 'weather.warningsHint' | translate }}</p>
+    }
+  </section>
+
+  <!-- Reports -->
+  <section class="s2s-panel" aria-labelledby="reports-title">
+    <header class="section-head">
+      <h2 id="reports-title">{{ 'weather.reportsTitle' | translate }}</h2>
+      @if (w.canRecord) {
+        <div class="actions">
+          <p-button [label]="'weather.recordReport' | translate" icon="pi pi-plus" size="small" (onClick)="openReport(null)" />
+        </div>
+      }
+    </header>
+    <p class="s2s-muted hint">{{ 'weather.reportsHint' | translate: { zone: w.timezone } }}</p>
+    @for (report of w.reports; track report.id) {
+      <article class="report">
+        <header class="report-head">
+          <strong>{{ 'weather.kind.' + report.kind | translate }}</strong>
+          <span class="tags">
+            <s2s-status-tag [status]="report.status" />
+            @if (report.expired) { <p-tag [value]="'weather.expired' | translate" severity="secondary" /> }
+          </span>
+        </header>
+        <dl class="facts">
+          <div><dt>{{ 'weather.sourceLabel' | translate }}</dt><dd>{{ 'weather.source.' + report.source | translate }}@if (report.providerName) { · {{ report.providerName }} }</dd></div>
+          @if (report.kind === 'FORECAST') {
+            <div><dt>{{ 'weather.issuedAt' | translate }}</dt><dd>{{ report.issuedAt | utcDateTime: w.timezone }}</dd></div>
+            <div><dt>{{ 'weather.validity' | translate }}</dt><dd>{{ report.validFrom | utcDateTime: w.timezone }} – {{ report.validTo | utcDateTime: w.timezone }}</dd></div>
+          } @else {
+            <div><dt>{{ 'weather.observedAt' | translate }}</dt><dd>{{ report.observedAt | utcDateTime: w.timezone }}</dd></div>
+          }
+          @if (report.area) { <div><dt>{{ 'weather.area' | translate }}</dt><dd>{{ report.area }}</dd></div> }
+          @if (report.file; as file) {
+            <div><dt>{{ 'weather.file' | translate }}</dt><dd><button type="button" class="link" (click)="view(report)">{{ file.name }}</button>
+              <span class="s2s-muted"> · {{ 'status.' + file.scanState | translate }}</span></dd></div>
+          }
+          @if (report.notes) { <div class="wide"><dt>{{ 'weather.notes' | translate }}</dt><dd class="pre">{{ report.notes }}</dd></div> }
+        </dl>
+        @if (report.values.length) {
+          @let t = table(report);
+          <div class="table-wrap">
+            <table class="grid">
+              <thead><tr>
+                <th scope="col">{{ 'weather.time' | translate }}</th>
+                @for (c of t.columns; track c) { <th scope="col" class="num">{{ parameterLabel(c) }}</th> }
+              </tr></thead>
+              <tbody>
+                @for (row of t.rows; track row.at) {
+                  <tr><td>{{ row.at | utcDateTime: w.timezone }}</td>@for (cell of row.cells; track $index) { <td class="num">{{ cell }}</td> }</tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        <p class="s2s-muted trail-line">
+          {{ 'weather.recordedBy' | translate: { name: report.recordedByName, at: (report.recordedAt | utcDateTime: w.timezone) } }}
+          @if (report.reviewedAt) {
+            · {{ (report.status === 'ACCEPTED' ? 'weather.acceptedBy' : 'weather.rejectedBy') | translate:
+              { name: report.reviewedByName, at: (report.reviewedAt | utcDateTime: w.timezone) } }}
+            @if (report.reviewReason) { — <em>{{ report.reviewReason }}</em> }
+          }
+        </p>
+        @if (report.canEdit || report.canReview) {
+          <div class="actions">
+            @if (report.canEdit) {
+              <p-button [label]="'weather.edit' | translate" icon="pi pi-pencil" [outlined]="true" size="small" (onClick)="openReport(report)" />
+            }
+            @if (report.canReview) {
+              <p-button [label]="'weather.accept' | translate" icon="pi pi-check" size="small" (onClick)="openReview(report, 'accept')" />
+              <p-button [label]="'weather.reject' | translate" icon="pi pi-times" severity="danger" [outlined]="true" size="small"
+                (onClick)="openReview(report, 'reject')" />
+            }
+          </div>
+        }
+      </article>
+    } @empty {
+      <s2s-empty-state messageKey="weather.noReports" icon="pi pi-cloud" />
+    }
+  </section>
+}
+
+<!-- Approve limits -->
+<p-dialog [header]="'weather.approve' | translate" [visible]="dialog() === 'approve'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'weather.approveHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'weather.approve' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="decideLimits('APPROVE', null)" />
+  </ng-template>
+</p-dialog>
+
+<s2s-reason-dialog [visible]="dialog() === 'return'" (visibleChange)="closeDialog($event)" headerKey="weather.return" messageKey="weather.returnHint"
+  confirmKey="weather.return" [reasonRequired]="true" [saving]="saving()" (confirmed)="decideLimits('RETURN', $event)" />
+
+<s2s-reason-dialog [visible]="dialog() === 'accept'" (visibleChange)="closeDialog($event)" headerKey="weather.accept" messageKey="weather.acceptHint"
+  confirmKey="weather.accept" [reasonRequired]="false" [saving]="saving()" (confirmed)="review('ACCEPT', $event)" />
+
+<s2s-reason-dialog [visible]="dialog() === 'reject'" (visibleChange)="closeDialog($event)" headerKey="weather.reject" messageKey="weather.rejectHint"
+  confirmKey="weather.reject" [reasonRequired]="true" [saving]="saving()" (confirmed)="review('REJECT', $event)" />
+
+<!-- Record / edit a report -->
+<p-dialog [header]="(editingReport() ? 'weather.editReport' : 'weather.recordReport') | translate" [visible]="dialog() === 'report'"
+  (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false" [style]="{ width: 'min(48rem, 96vw)' }">
+  @if (dialog() === 'report') {
+    @if (dialogError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+    <form [formGroup]="reportForm" (ngSubmit)="saveReport()" novalidate class="dialog-form">
+      <div class="fields">
+        <s2s-form-field labelKey="weather.kindLabel" fieldId="r-kind" [control]="reportForm.controls.kind">
+          <p-select inputId="r-kind" formControlName="kind" [options]="kindOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="weather.sourceLabel" fieldId="r-source" [control]="reportForm.controls.source">
+          <p-select inputId="r-source" formControlName="source" [options]="sourceOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+        </s2s-form-field>
+        @if (reportForm.controls.kind.value === 'FORECAST') {
+          <s2s-form-field labelKey="weather.provider" fieldId="r-provider" [control]="reportForm.controls.providerName" [required]="true">
+            <input pInputText id="r-provider" formControlName="providerName" maxlength="100" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="weather.issuedAt" fieldId="r-issued" [control]="reportForm.controls.issuedAt" [required]="true">
+            <s2s-date-time-picker inputId="r-issued" formControlName="issuedAt" appendTo="body" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="weather.validFrom" fieldId="r-from" [control]="reportForm.controls.validFrom" [required]="true">
+            <s2s-date-time-picker inputId="r-from" formControlName="validFrom" appendTo="body" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="weather.validTo" fieldId="r-to" [control]="reportForm.controls.validTo" [required]="true">
+            <s2s-date-time-picker inputId="r-to" formControlName="validTo" appendTo="body" />
+          </s2s-form-field>
+        } @else {
+          <s2s-form-field labelKey="weather.observedAt" fieldId="r-observed" [control]="reportForm.controls.observedAt" [required]="true">
+            <s2s-date-time-picker inputId="r-observed" formControlName="observedAt" appendTo="body" />
+          </s2s-form-field>
+        }
+        <s2s-form-field labelKey="weather.area" fieldId="r-area" [control]="reportForm.controls.area">
+          <input pInputText id="r-area" formControlName="area" maxlength="200" />
+        </s2s-form-field>
+        <div class="wide">
+          <s2s-form-field labelKey="weather.notes" fieldId="r-notes" [control]="reportForm.controls.notes">
+            <textarea pTextarea id="r-notes" formControlName="notes" rows="2" maxlength="2000"></textarea>
+          </s2s-form-field>
+        </div>
+        @if (!editingReport()) {
+          <div class="wide">
+            <label for="r-file" class="file-label">{{ 'weather.file' | translate }}</label>
+            <input id="r-file" type="file" accept="application/pdf,image/png,image/jpeg" (change)="pickFile($event)" />
+            <p class="s2s-muted hint">{{ 'weather.fileHint' | translate }}</p>
+          </div>
+        }
+      </div>
+
+      <h3>{{ 'weather.values' | translate }}</h3>
+      <p class="s2s-muted hint">{{ 'weather.valuesHint' | translate: { zone: timezone() } }}</p>
+      <div formArrayName="times" class="rows">
+        @for (time of reportForm.controls.times.controls; track time; let i = $index) {
+          <div class="row-card" [formGroupName]="i">
+            <s2s-form-field labelKey="weather.time" [fieldId]="'t-at-' + i" [control]="time.controls.at" [required]="true">
+              <s2s-date-time-picker [inputId]="'t-at-' + i" formControlName="at" appendTo="body" />
+            </s2s-form-field>
+            <ng-container formGroupName="values">
+              @for (p of activeParameters(); track p.code) {
+                <s2s-form-field [labelKey]="p.label + ' (' + p.unit + ')'" [fieldId]="'t-' + p.code + '-' + i" [control]="time.controls.values.controls[p.code]">
+                  <input pInputText [id]="'t-' + p.code + '-' + i" [formControlName]="p.code" inputmode="decimal" />
+                </s2s-form-field>
+              }
+            </ng-container>
+            <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="removeTime(i)" />
+          </div>
+        }
+      </div>
+      <p-button [label]="'weather.addTime' | translate" icon="pi pi-plus" [text]="true" (onClick)="addTime()" />
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveReport()" />
+  </ng-template>
+</p-dialog>
+
+<p-dialog [header]="viewing()?.name ?? ''" [visible]="dialog() === 'view'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [maximizable]="true" [style]="{ width: 'min(60rem, 96vw)' }">
+  <s2s-document-viewer [file]="viewing()" />
+</p-dialog>

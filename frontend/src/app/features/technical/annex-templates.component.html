@@ -1,0 +1,96 @@
+<s2s-page-header [heading]="'annex.title' | translate" [subtitle]="'annex.subtitle' | translate">
+  @if (canWrite() && !hasDraft()) {
+    <p-button [label]="'annex.newDraft' | translate" icon="pi pi-plus" [outlined]="true" [loading]="saving()" (onClick)="newDraft()" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" [text]="key | translate" />
+}
+
+@if (templates().length === 0) {
+  <section class="s2s-panel empty"><s2s-empty-state messageKey="annex.empty" icon="pi pi-book" /></section>
+} @else {
+  <div class="layout">
+    <nav class="s2s-panel revisions" [attr.aria-label]="'annex.versions' | translate">
+      <h2>{{ 'annex.versions' | translate }}</h2>
+      <ul>
+        @for (t of templates(); track t.id) {
+          <li>
+            <button type="button" [class.active]="t.id === selected()?.id" [attr.aria-current]="t.id === selected()?.id ? 'true' : null" (click)="select(t.id)">
+              <span>{{ 'annex.versionLabel' | translate: { no: t.versionNo } }}</span>
+              <s2s-status-tag [status]="t.status" />
+            </button>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    @if (selected(); as t) {
+      <article class="detail">
+        <section class="s2s-panel head">
+          <header class="detail-head">
+            <h2>{{ t.name }} · {{ 'annex.versionLabel' | translate: { no: t.versionNo } }}</h2>
+            <s2s-status-tag [status]="t.status" />
+          </header>
+          <ul class="trail">
+            @if (t.updatedAt) { <li>{{ 'annex.updatedBy' | translate: { name: t.updatedByName ?? '—', at: (t.updatedAt | utcDateTime) } }}</li> }
+            @if (t.publishedAt) {
+              <li>{{ 'annex.publishedBy' | translate: { name: t.publishedByName, at: (t.publishedAt | utcDateTime) } }}</li>
+              <li>{{ 'annex.confirmedBy' | translate: { text: t.ownerConfirmation } }}</li>
+            }
+          </ul>
+          @if (editable()) {
+            <p-message severity="info" [text]="'annex.draftHint' | translate" />
+            <div class="actions">
+              <p-button [label]="'common.save' | translate" icon="pi pi-check" [disabled]="!dirty()" [loading]="saving()" (onClick)="save()" />
+            </div>
+          }
+        </section>
+
+        <form [formGroup]="form" (ngSubmit)="save()" novalidate class="sections">
+          <section class="s2s-panel">
+            <s2s-form-field labelKey="annex.name" fieldId="annex-name" [control]="form.controls.name" [required]="true">
+              <input pInputText id="annex-name" formControlName="name" maxlength="150" />
+            </s2s-form-field>
+          </section>
+          <div formArrayName="sections" class="sections">
+            @for (row of form.controls.sections.controls; track row; let i = $index) {
+              <section class="s2s-panel" [formGroupName]="i">
+                <div class="fields">
+                  <s2s-form-field labelKey="annex.code" [fieldId]="'an-code-' + i" [control]="row.controls.code" [required]="true" hintKey="annex.codeHint">
+                    <input pInputText [id]="'an-code-' + i" formControlName="code" maxlength="40" />
+                  </s2s-form-field>
+                  <s2s-form-field labelKey="annex.appliesWhen" [fieldId]="'an-when-' + i" [control]="row.controls.appliesWhen">
+                    <p-select [inputId]="'an-when-' + i" formControlName="appliesWhen" [options]="conditionOptions()" optionLabel="label"
+                      optionValue="value" appendTo="body" />
+                  </s2s-form-field>
+                  <div class="wide">
+                    <s2s-form-field labelKey="annex.sectionTitle" [fieldId]="'an-title-' + i" [control]="row.controls.title" [required]="true">
+                      <input pInputText [id]="'an-title-' + i" formControlName="title" maxlength="200" />
+                    </s2s-form-field>
+                  </div>
+                  <div class="wide">
+                    <s2s-form-field labelKey="annex.body" [fieldId]="'an-body-' + i" [control]="row.controls.body">
+                      <textarea pTextarea [id]="'an-body-' + i" formControlName="body" rows="6" [autoResize]="true"></textarea>
+                    </s2s-form-field>
+                    @if (!row.controls.body.value.trim()) {
+                      <p class="s2s-muted hint">{{ 'annex.bodyMissing' | translate }}</p>
+                    }
+                  </div>
+                </div>
+                @if (editable()) {
+                  <p-button [label]="'annex.removeSection' | translate" icon="pi pi-trash" [text]="true" severity="danger" (onClick)="removeSection(i)" />
+                }
+              </section>
+            }
+          </div>
+          @if (editable()) {
+            <p-button [label]="'annex.addSection' | translate" icon="pi pi-plus" [text]="true" (onClick)="addSection()" />
+          }
+        </form>
+      </article>
+    }
+  </div>
+}
+

@@ -1,0 +1,35 @@
+<section class="panel approvals-panel" aria-labelledby="approvals-title">
+  <div class="section-heading">
+    <span class="section-icon"><i class="pi pi-check-square" aria-hidden="true"></i></span>
+    <div>
+      <h2 id="approvals-title">{{ 'dashboard.approvals' | translate }}</h2>
+      <p>{{ 'dashboard.approvalsHint' | translate }}</p>
+    </div>
+  </div>
+  @if (approvals(); as items) {
+    @if (items === 'error') {
+      <p role="alert">{{ 'dashboard.loadFailed' | translate }}</p>
+    } @else {
+      <ul class="approvals">
+        @for (item of items; track item.versionId) {
+          <li>
+            <a [routerLink]="['/commercial/enquiries', item.enquiryId, 'quotation']">
+              <span class="approval-main">
+                <strong>{{ item.quotationReference }} · v{{ item.versionNo }}</strong>
+                <span>{{ item.clientName }} · {{ item.enquiryReference }}</span>
+              </span>
+              <span class="approval-side">
+                <strong>{{ item.totalAmount | money: item.currency }}</strong>
+                <span>{{ item.submittedByName }} · {{ item.submittedAt | utcDateTime }}</span>
+              </span>
+            </a>
+          </li>
+        } @empty {
+          <li class="empty-links">{{ 'dashboard.noApprovals' | translate }}</li>
+        }
+      </ul>
+    }
+  } @else {
+    <p>{{ 'dashboard.loading' | translate }}</p>
+  }
+</section>

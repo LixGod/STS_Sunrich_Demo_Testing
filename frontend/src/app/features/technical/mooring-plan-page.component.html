@@ -1,0 +1,365 @@
+<s2s-page-header [heading]="overview()?.jobNumber ?? ''" [subtitle]="'mooring.title' | translate">
+  <a [routerLink]="['/jobs', jobId()]">Job overview</a>
+  <a [routerLink]="['/jobs', jobId(), 'technical']">{{ 'mooring.backToTechnical' | translate }}</a>
+  @if (canReadJpo()) { <a [routerLink]="['/jobs', jobId(), 'jpo']">JPO →</a> }
+  @if (overview()?.canCreate && overview()!.revisions.length) {
+    <p-button [label]="'mooring.newRevision' | translate" icon="pi pi-plus" [disabled]="busy()" (onClick)="create()" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+
+<section class="s2s-panel" aria-label="Mooring plan guidance">
+  <p><strong>Start with both vessels' GA plans.</strong> STS Admin uploads PNG or JPEG plans on each vessel record. Marine may upload a job-specific replacement in <a [routerLink]="['/jobs', jobId(), 'technical']">document collection</a>. The first mooring revision adds the latest image for each vessel as a reference layer. PDF plans remain viewable as documents.</p>
+  <p>The images start uncalibrated and may overlap on the drawing; both remain visible separately under Reference layers. Marine positions the vessels and mooring lines, checks sourced dimensions and capacities, then submits for independent approval. GA images do not determine safe line positions automatically.</p>
+</section>
+
+@if (overview(); as current) {
+  @if (current.revisions.length === 0) {
+    <section class="s2s-panel">
+      <p>{{ 'mooring.empty' | translate }}</p>
+      @if (current.canCreate) { <p-button [label]="'mooring.prepare' | translate" icon="pi pi-plus" [disabled]="busy()" (onClick)="create()" /> }
+    </section>
+  } @else {
+    <nav class="s2s-panel revisions" [attr.aria-label]="'mooring.revisions' | translate">
+      @for (r of current.revisions; track r.id) {
+        <button type="button" [class.active]="selectedId() === r.id" (click)="select(r.id)">
+          {{ 'mooring.revisionLabel' | translate: { no: r.revisionNo } }} · {{ r.status }}
+        </button>
+      }
+    </nav>
+  }
+}
+
+@if (revision(); as rev) {
+  @if (model(); as draft) {
+    <section class="s2s-panel summary">
+      <div class="summary-head">
+        <h2>{{ 'mooring.revisionLabel' | translate: { no: rev.revisionNo } }}</h2>
+        <s2s-status-tag [status]="rev.status" />
+      </div>
+      <div class="actions">
+        <a class="link-button" [href]="pdfUrl()" target="_blank" rel="noopener">{{ (rev.pdfSha256 ? 'mooring.pdf' : 'mooring.pdfDraft') | translate }}</a>
+        @if (rev.pdfSha256) { <p-button label="Share issued plan" icon="pi pi-share-alt" [outlined]="true" (onClick)="shareIssuedPlan()" /> }
+        @if (editable()) { <p-button [label]="'common.save' | translate" [disabled]="!dirty() || busy() || objectForm.dirty || lineForm.dirty" (onClick)="save()" /> }
+        @if (can().has('SUBMIT')) { <p-button [label]="'mooring.submit' | translate" [disabled]="dirty() || rev.blockers.length > 0 || busy()" (onClick)="submit()" /> }
+        @if (can().has('APPROVE')) { <p-button [label]="'mooring.approve' | translate" [disabled]="busy()" (onClick)="approve()" /> }
+        @if (can().has('RETURN')) { <p-button [label]="'mooring.return' | translate" [outlined]="true" (onClick)="returnOpen.set(true)" /> }
+        @if (can().has('ISSUE')) { <p-button [label]="'mooring.issue' | translate" [disabled]="busy()" (onClick)="issue()" /> }
+      </div>
+      @if (shareError(); as message) { <p-message severity="warn" [text]="message" /> }
+      @if (dirty()) { <p class="hint">{{ 'mooring.saveFirst' | translate }}</p> }
+      @if (rev.returnedReason) { <p-message severity="warn" [text]="'mooring.returnedReason' | translate: { reason: rev.returnedReason }" /> }
+      @if (rev.blockers.length) {
+        <div class="notice blockers" role="status">
+          <h3>{{ 'mooring.blockers' | translate }}</h3>
+          <ul>@for (blocker of rev.blockers; track blocker.code) { <li>{{ blocker.message }}</li> }</ul>
+        </div>
+      }
+      @if (rev.warnings.length) {
+        <div class="notice warnings" role="status">
+          <h3>{{ 'mooring.warnings' | translate }}</h3>
+          <ul>@for (warning of rev.warnings; track $index) { <li>{{ warning }}</li> }</ul>
+        </div>
+      }
+    </section>
+
+    <nav class="step-nav s2s-panel" aria-label="Mooring plan operator flow">
+      <button type="button" class="step-nav-btn" [class.active]="operatorStep() === 1" (click)="operatorStep.set(1)">
+        <span class="step-badge">1</span>
+        <span class="step-info"><strong>Vessel Placement</strong>Heading & Alongside Clearance</span>
+      </button>
+      <button type="button" class="step-nav-btn" [class.active]="operatorStep() === 2" (click)="operatorStep.set(2)">
+        <span class="step-badge">2</span>
+        <span class="step-info"><strong>Fenders & Lines</strong>Fenders & OCIMF Lines</span>
+      </button>
+      <button type="button" class="step-nav-btn" [class.active]="operatorStep() === 3" (click)="operatorStep.set(3)">
+        <span class="step-badge">3</span>
+        <span class="step-info"><strong>Review & Send</strong>Approve & Send to Masters</span>
+      </button>
+    </nav>
+
+    <div class="workspace">
+      <section class="s2s-panel drawing-panel">
+        <h2>{{ 'mooring.drawing' | translate }}</h2>
+        <s2s-mooring-plan-canvas [model]="draft" [snapshot]="rev.snapshot" [layerUrls]="layerUrls()"
+          [editable]="editable()" (moved)="moveObject($event)" (objectSelected)="editObjectFromCanvas($event)" />
+        <div class="legend" [attr.aria-label]="'mooring.legend' | translate">
+          @for (symbol of symbols; track symbol) {
+            @if (symbol !== 'MOORING_POINT' && symbol !== 'ANNOTATION') {
+              <button type="button" [disabled]="!editable()" (click)="addSymbol(symbol)">{{ 'mooring.symbols.' + symbol | translate }}</button>
+            }
+          }
+        </div>
+        <p class="hint">{{ 'mooring.canvasHint' | translate }}</p>
+      </section>
+
+      <div class="editors">
+        <!-- Step 1: Vessel Placement -->
+        @if (operatorStep() === 1) {
+          <section class="s2s-panel" id="mooring-vessels">
+            <h2>Step 1 · Vessel Placement & Manifold Alignment</h2>
+            <p class="hint">Ensure Mother and Daughter vessels are aligned alongside with safe clearance.</p>
+            @for (vessel of rev.snapshot.vessels; track vessel.jobVesselId) {
+              <article class="item">
+                <h3>{{ vessel.role }} · {{ vessel.name }}</h3>
+                <ul class="facts">@for (d of vessel.dimensions; track d.code) {
+                  <li>{{ d.code }}: {{ d.value ?? ('mooring.missing' | translate) }} {{ d.unit }}</li>
+                }</ul>
+              </article>
+            }
+            <form [formGroup]="vesselForm" (ngSubmit)="saveVessel()" class="fields">
+              <h3>{{ 'mooring.positionVessel' | translate }}</h3>
+              <label>{{ 'mooring.vessel' | translate }}<select formControlName="jobVesselId" (change)="chooseVessel(vesselForm.controls.jobVesselId.value)">
+                @for (vessel of rev.snapshot.vessels; track vessel.jobVesselId) { <option [value]="vessel.jobVesselId">{{ vessel.role }} · {{ vessel.name }}</option> }
+              </select></label>
+              <label>{{ 'mooring.heading' | translate }}<select formControlName="heading">
+                <option [ngValue]="null">{{ 'mooring.choose' | translate }}</option>
+                <option value="CONSTANT">{{ 'mooring.constant' | translate }}</option><option value="MANOEUVRING">{{ 'mooring.manoeuvring' | translate }}</option>
+              </select></label>
+              <label>{{ 'mooring.lateralOffset' | translate }}<input type="number" step="0.001" formControlName="lateralOffsetM" /></label>
+              <label>{{ 'mooring.orientation' | translate }}<select formControlName="orientation">
+                <option value="BOW_UP">{{ 'mooring.bowUp' | translate }}</option><option value="BOW_DOWN">{{ 'mooring.bowDown' | translate }}</option>
+              </select></label>
+              @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+            </form>
+            <div class="step-nav-footer">
+              <button type="button" class="btn-step-nav" (click)="operatorStep.set(2)">Next: Fenders & Mooring Lines →</button>
+            </div>
+          </section>
+        }
+
+        <!-- Step 2: Fenders and Mooring Lines -->
+        @if (operatorStep() === 2) {
+          <section class="s2s-panel" id="mooring-lines-step">
+            <h2>Step 2 · Fenders & Mooring Lines</h2>
+            <div class="quick-template-box">
+              <button type="button" class="btn-standard-layout" [disabled]="!editable()" (click)="applyStandardLayout()">
+                ⚡ Apply Standard STS Mooring Layout
+              </button>
+              <p class="hint">Instantly places 4 primary fenders, 2 secondary fenders, and the 6 standard OCIMF mooring lines.</p>
+            </div>
+
+            <h3>Mooring Lines ({{ draft.lines.length }})</h3>
+            <div class="item-list">@for (line of draft.lines; track line.id) {
+              <button type="button" (click)="chooseLine(line.id)" [class.active]="lineId() === line.id">
+                {{ line.label }} · Berthing #{{ line.berthingOrder ?? '—' }} / Unmooring #{{ line.unmooringOrder ?? '—' }}
+              </button>
+            }</div>
+            @if (editable()) { <button type="button" (click)="chooseLine(null)">{{ 'mooring.addLine' | translate }}</button> }
+
+            @if (lineEditorOpen()) {
+              <form [formGroup]="lineForm" (ngSubmit)="saveLine()" class="fields">
+                <label>{{ 'mooring.lineId' | translate }}<input type="text" maxlength="30" formControlName="label" /></label>
+                <label>{{ 'mooring.vessel' | translate }}<select formControlName="jobVesselId">
+                  @for (vessel of rev.snapshot.vessels; track vessel.jobVesselId) { <option [value]="vessel.jobVesselId">{{ vessel.role }}</option> }
+                </select></label>
+                <label>{{ 'mooring.fromPoint' | translate }}<select formControlName="fromPointId">
+                  <option [ngValue]="null">{{ 'mooring.choose' | translate }}</option>
+                  @for (point of draft.objects; track point.id) { @if (point.type === 'MOORING_POINT') { <option [value]="point.id">{{ point.label || point.id }}</option> } }
+                </select></label>
+                <label>{{ 'mooring.toPoint' | translate }}<select formControlName="toPointId">
+                  <option [ngValue]="null">{{ 'mooring.choose' | translate }}</option>
+                  @for (point of draft.objects; track point.id) { @if (point.type === 'MOORING_POINT') { <option [value]="point.id">{{ point.label || point.id }}</option> } }
+                </select></label>
+                <label>{{ 'mooring.berthingOrder' | translate }}<input type="number" min="1" formControlName="berthingOrder" /></label>
+                <label>{{ 'mooring.unmooringOrder' | translate }}<input type="number" min="1" formControlName="unmooringOrder" /></label>
+                @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+                @if (editable() && lineId()) { <button type="button" (click)="deleteLine()">{{ 'mooring.delete' | translate }}</button> }
+              </form>
+            }
+
+            <h3>Fenders & Objects ({{ draft.objects.length }})</h3>
+            <div class="item-list">@for (obj of draft.objects; track obj.id) {
+              <button type="button" (click)="chooseObject(obj.id)" [class.active]="objectId() === obj.id">
+                {{ obj.label || obj.type }} ({{ obj.xM }}, {{ obj.yM }})
+              </button>
+            }</div>
+            @if (editable()) { <button type="button" (click)="chooseObject(null)">{{ 'mooring.addObject' | translate }}</button> }
+
+            @if (objectEditorOpen()) {
+              <form id="mooring-object-editor" [formGroup]="objectForm" (ngSubmit)="saveObject()" class="fields">
+                <label>{{ 'mooring.symbol' | translate }}<select formControlName="type">
+                  @for (symbol of symbols; track symbol) { <option [value]="symbol">{{ 'mooring.symbols.' + symbol | translate }}</option> }
+                </select></label>
+                <label>{{ 'mooring.label' | translate }}<input type="text" maxlength="200" formControlName="label" /></label>
+                <label>{{ 'mooring.xMetres' | translate }}<input type="number" step="0.001" formControlName="xM" /></label>
+                <label>{{ 'mooring.yMetres' | translate }}<input type="number" step="0.001" formControlName="yM" /></label>
+                @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+                @if (editable() && objectId()) { <button type="button" (click)="deleteObject()">{{ 'mooring.delete' | translate }}</button> }
+              </form>
+            }
+
+            <div class="step-nav-footer">
+              <button type="button" (click)="operatorStep.set(1)">← Back to Vessels</button>
+              <button type="button" class="btn-step-nav" (click)="operatorStep.set(3)">Next: Review & Send →</button>
+            </div>
+          </section>
+        }
+
+        <!-- Step 3: Review & Send to Masters -->
+        @if (operatorStep() === 3) {
+          <section class="s2s-panel" id="mooring-send-step">
+            <h2>Step 3 · Review & Send Mooring Plan</h2>
+            <p class="hint">Verify readiness, issue the mooring plan, and send it to both vessel masters in advance of arrival.</p>
+
+            @if (rev.blockers.length === 0) {
+              <div class="readiness-box ready">
+                ✓ Mooring plan layout is verified without blockers. Ready to issue and send.
+              </div>
+            } @else {
+              <div class="notice blockers" role="status">
+                <h3>{{ 'mooring.blockers' | translate }} ({{ rev.blockers.length }})</h3>
+                <ul>@for (blocker of rev.blockers; track blocker.code) { <li>{{ blocker.message }}</li> }</ul>
+              </div>
+            }
+
+            <div class="send-flow-card">
+              <h3>Advance Dispatch to Vessel Masters</h3>
+              <p>Send the issued mooring plan PDF to both masters before arrival so berthing starts without delays.</p>
+              <div class="actions">
+                <a class="link-button" [href]="pdfUrl()" target="_blank" rel="noopener">📄 {{ (rev.pdfSha256 ? 'mooring.pdf' : 'mooring.pdfDraft') | translate }}</a>
+                @if (rev.pdfSha256) {
+                  <button type="button" class="btn-share-masters" (click)="shareIssuedPlan()">
+                    📲 Share Issued Plan with Masters
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="step-nav-footer">
+              <button type="button" (click)="operatorStep.set(2)">← Back to Fenders & Lines</button>
+            </div>
+          </section>
+        }
+
+        <!-- Advanced settings collapsed for technical admin -->
+        <details class="s2s-panel advanced">
+          <summary>Advanced Settings (Reference Layers, Dimensions & Capacities)</summary>
+          <form [formGroup]="rulerForm" (ngSubmit)="saveRuler()" class="fields">
+            <label>{{ 'mooring.rulerStep' | translate }}
+              <input type="number" min="0.001" step="0.001" formControlName="step" [readonly]="!editable()" />
+            </label>
+            @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+          </form>
+
+          <form [formGroup]="particularForm" (ngSubmit)="saveParticular()" class="fields">
+            <h3>{{ 'mooring.planParticular' | translate }} · {{ particularForm.controls.code.value }}</h3>
+            <label>{{ 'mooring.vessel' | translate }}<select formControlName="jobVesselId">
+              @for (vessel of rev.snapshot.vessels; track vessel.jobVesselId) { <option [value]="vessel.jobVesselId">{{ vessel.role }}</option> }
+            </select></label>
+            <label>{{ 'mooring.field' | translate }}<select formControlName="code">
+              @for (code of parts; track code) { <option [value]="code">{{ code }}</option> }
+            </select></label>
+            <label>{{ 'mooring.valueMetres' | translate }}<input type="number" min="0" step="0.001" formControlName="value" /></label>
+            <label>{{ 'mooring.sourceDocument' | translate }}<select formControlName="sourceDocumentId">
+              <option [ngValue]="null">{{ 'mooring.choose' | translate }}</option>
+              @for (doc of sourceDocs(particularForm.controls.jobVesselId.value); track doc.id) { <option [value]="doc.id">{{ doc.fileName }}</option> }
+            </select></label>
+            <label>{{ 'mooring.sourcePage' | translate }}<input type="number" min="1" formControlName="sourcePage" /></label>
+            <label>{{ 'mooring.sourceDescription' | translate }}<input type="text" maxlength="200" formControlName="sourceText" /></label>
+            @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+            @if (can().has('VERIFY_VALUE') && !dirty() && particularForm.controls.code.value) {
+              <button type="button" (click)="verify(particularKey())">{{ verified(particularKey()) ? ('mooring.verified' | translate) : ('mooring.verify' | translate) }}</button>
+            }
+          </form>
+
+          <h3>{{ 'mooring.capacityTable' | translate }}</h3>
+          @for (column of rev.snapshot.capacityColumns; track column.code) {
+            <div class="column-status">{{ column.label }} · {{ column.status }} · {{ column.unit || ('mooring.unitPending' | translate) }}</div>
+          }
+          @for (line of draft.lines; track line.id) {
+            <div class="capacity-row"><strong>{{ line.label }}</strong>
+              @for (column of rev.snapshot.capacityColumns; track column.code) {
+                <button type="button" (click)="chooseCapacity(line.id, column.code)">{{ column.label }}: {{ capacityDisplay(line, column.code) }}</button>
+              }
+            </div>
+          }
+          <form [formGroup]="capacityForm" (ngSubmit)="saveCapacity()" class="fields">
+            <h3>{{ 'mooring.editCapacity' | translate }}</h3>
+            <label>{{ 'mooring.lineId' | translate }}<select formControlName="lineId">
+              @for (line of draft.lines; track line.id) { <option [value]="line.id">{{ line.label }}</option> }
+            </select></label>
+            <label>{{ 'mooring.column' | translate }}<select formControlName="columnCode">
+              @for (column of rev.snapshot.capacityColumns; track column.code) { <option [value]="column.code">{{ column.label }}</option> }
+            </select></label>
+            <label>{{ 'mooring.value' | translate }}<input type="number" min="0" step="0.001" formControlName="value" /></label>
+            <label>{{ 'mooring.sourceDocument' | translate }}<select formControlName="sourceDocumentId">
+              <option [ngValue]="null">{{ 'mooring.choose' | translate }}</option>
+              @for (doc of sourceDocs(lineForm.controls.jobVesselId.value); track doc.id) { <option [value]="doc.id">{{ doc.fileName }}</option> }
+            </select></label>
+            <label>{{ 'mooring.sourcePage' | translate }}<input type="number" min="1" formControlName="sourcePage" /></label>
+            <label>{{ 'mooring.sourceDescription' | translate }}<input type="text" maxlength="200" formControlName="sourceText" /></label>
+            @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+            @if (can().has('VERIFY_VALUE') && !dirty() && capacityForm.controls.lineId.value && capacityForm.controls.columnCode.value) {
+              <button type="button" (click)="verify(capacityKey())">{{ verified(capacityKey()) ? ('mooring.verified' | translate) : ('mooring.verify' | translate) }}</button>
+            }
+          </form>
+
+          @if (canManageColumns()) {
+            <form [formGroup]="columnForm" (ngSubmit)="saveColumn()" class="fields">
+              <h3>{{ 'mooring.defineColumn' | translate }}</h3>
+              <label>{{ 'mooring.column' | translate }}<select formControlName="code" (change)="chooseColumn(columnForm.controls.code.value)">
+                @for (column of rev.snapshot.capacityColumns; track column.code) { <option [value]="column.code">{{ column.label }}</option> }
+              </select></label>
+              <label>{{ 'mooring.definition' | translate }}<input type="text" maxlength="500" formControlName="definition" /></label>
+              <label>{{ 'mooring.unit' | translate }}<input type="text" maxlength="30" formControlName="unit" /></label>
+              <label>{{ 'mooring.evidenceRequirement' | translate }}<input type="text" maxlength="500" formControlName="evidenceRequirement" /></label>
+              <button type="submit" [disabled]="busy()">{{ 'mooring.activateDefinition' | translate }}</button>
+            </form>
+            <form [formGroup]="ruleForm" (ngSubmit)="saveRule()" class="fields">
+              <h3>{{ 'mooring.reconciliationRule' | translate }}</h3>
+              <label>{{ 'mooring.toleranceMetres' | translate }}<input type="number" min="0" step="0.001" formControlName="toleranceM" /></label>
+              <label class="check"><input type="checkbox" formControlName="active" />{{ 'mooring.ruleActive' | translate }}</label>
+              <button type="submit" [disabled]="busy() || !rule()">{{ 'mooring.saveRule' | translate }}</button>
+            </form>
+          }
+
+          <h3>{{ 'mooring.referenceLayers' | translate }}</h3>
+          @if (draft.layers.length) {
+            <div class="reference-gallery">
+              @for (layer of draft.layers; track layer.id) {
+                @if (layerUrls()[layer.documentVersionId]; as url) {
+                  <figure><img [src]="url" [alt]="'GA reference for ' + vesselName(layer.jobVesselId)" />
+                    <figcaption>{{ vesselName(layer.jobVesselId) }} · {{ documentFor(layer.documentVersionId)?.fileName }}</figcaption></figure>
+                }
+              }
+            </div>
+          }
+          <div class="item-list">@for (layer of draft.layers; track layer.id) {
+            <button type="button" (click)="chooseLayer(layer.id)">{{ documentFor(layer.documentVersionId)?.fileName || layer.documentVersionId }}</button>
+          }</div>
+          @if (editable()) { <button type="button" (click)="chooseLayer(null)">{{ 'mooring.addLayer' | translate }}</button> }
+          <form [formGroup]="layerForm" (ngSubmit)="saveLayer()" class="fields">
+            <label>{{ 'mooring.vessel' | translate }}<select formControlName="jobVesselId">
+              @for (vessel of rev.snapshot.vessels; track vessel.jobVesselId) { <option [value]="vessel.jobVesselId">{{ vessel.role }}</option> }
+            </select></label>
+            <label>{{ 'mooring.imageDocument' | translate }}<select formControlName="documentVersionId">
+              <option value="">{{ 'mooring.choose' | translate }}</option>
+              @for (doc of imageDocs(layerForm.controls.jobVesselId.value); track doc.id) { <option [value]="doc.id">{{ doc.fileName }}</option> }
+            </select></label>
+            <label>{{ 'mooring.xMetres' | translate }}<input type="number" step="0.001" formControlName="xM" /></label>
+            <label>{{ 'mooring.yMetres' | translate }}<input type="number" step="0.001" formControlName="yM" /></label>
+            <label>{{ 'mooring.scale' | translate }}<input type="number" min="0.001" step="0.001" formControlName="scale" /></label>
+            <label class="check"><input type="checkbox" formControlName="visible" />{{ 'mooring.visible' | translate }}</label>
+            @if (editable()) { <button type="submit">{{ 'mooring.apply' | translate }}</button> }
+            @if (editable() && layerId()) { <button type="button" (click)="deleteLayer()">{{ 'mooring.delete' | translate }}</button> }
+          </form>
+          <p>{{ 'mooring.pdfLayers' | translate }}</p>
+          @for (doc of documents(); track doc.id) { @if (doc.contentType === 'application/pdf') {
+            <button type="button" class="text-button" (click)="viewDocument(doc.id)">{{ doc.fileName }}</button>
+          } }
+        </details>
+      </div>
+    </div>
+  }
+}
+
+<s2s-reason-dialog [(visible)]="returnOpen" headerKey="mooring.return" messageKey="mooring.returnHint"
+  confirmKey="mooring.return" [saving]="busy()" (confirmed)="returnWith($event)" />
+@if (viewing()) {
+  <div class="viewer-panel s2s-panel">
+    <button type="button" (click)="viewing.set(null)">{{ 'common.close' | translate }}</button>
+    <s2s-document-viewer [file]="viewing()" />
+  </div>
+}

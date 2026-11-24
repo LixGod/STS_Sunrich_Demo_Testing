@@ -1,0 +1,12 @@
+<header class="page-header">
+  <div>
+    @if (backLink(); as destination) {
+      <a class="back-link" [routerLink]="destination"><i class="pi pi-arrow-left" aria-hidden="true"></i>{{ 'common.back' | translate }}</a>
+    }
+    <h1>{{ heading() }}</h1>
+    @if (subtitle()) {
+      <p class="s2s-muted">{{ subtitle() }}</p>
+    }
+  </div>
+  <div class="actions"><ng-content /></div>
+</header>

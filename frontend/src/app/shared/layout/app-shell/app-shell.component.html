@@ -1,0 +1,17 @@
+<a class="skip-link" href="#main-content">{{ 'nav.skipToContent' | translate }}</a>
+
+<s2s-top-bar (toggleNav)="toggleNav()" [navOpen]="navOpen()" />
+
+<div class="shell">
+  <s2s-side-nav class="sidenav" [class.open]="navOpen()" (navigated)="closeNav()" />
+  @if (navOpen()) {
+    <div class="backdrop" (click)="closeNav()" aria-hidden="true"></div>
+  }
+
+  <main id="main-content" class="content" tabindex="-1">
+    <s2s-breadcrumb />
+    <router-outlet />
+  </main>
+</div>
+
+<p-confirmdialog />

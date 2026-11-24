@@ -1,0 +1,119 @@
+<div class="toolbar" [class.stacked]="stackedToolbar()">
+  @if (searchable()) {
+    <p-iconfield class="search">
+      <p-inputicon class="pi pi-search" />
+      <input
+        pInputText
+        type="search"
+        [placeholder]="'table.search' | translate"
+        [attr.aria-label]="'table.search' | translate"
+        (input)="onSearch($event)" />
+    </p-iconfield>
+  }
+  <div class="toolbar-extra">
+    <ng-content select="[tableToolbar]" />
+  </div>
+</div>
+
+@if (state() === 'error') {
+  <div class="load-error" role="alert">
+    <span>{{ 'table.loadFailed' | translate }}</span>
+    <p-button [label]="'common.retry' | translate" icon="pi pi-refresh" size="small" [outlined]="true" (onClick)="reload()" />
+  </div>
+}
+
+<p-table
+  [value]="rows()"
+  dataKey="id"
+  [lazy]="true"
+  [lazyLoadOnInit]="false"
+  (onLazyLoad)="onLazyLoad($event)"
+  [paginator]="true"
+  [rows]="query().size"
+  [first]="query().page * query().size"
+  [totalRecords]="total()"
+  [rowsPerPageOptions]="pageSizes()"
+  [loading]="state() === 'loading'"
+  [showCurrentPageReport]="true"
+  [currentPageReportTemplate]="'table.pageReport' | translate"
+  [attr.aria-label]="captionKey() | translate"
+  class="s2s-table">
+  <ng-template #header>
+    <tr>
+      @for (column of columns(); track column.key) {
+        @if (column.sortField) {
+          <th [pSortableColumn]="column.sortField" [style.width]="column.width">
+            {{ column.headerKey | translate }}
+            <i
+              class="sort-icon pi"
+              [class.pi-sort-alt]="sortState().field !== column.sortField"
+              [class.pi-sort-amount-up-alt]="sortState().field === column.sortField && sortState().direction === 'asc'"
+              [class.pi-sort-amount-down]="sortState().field === column.sortField && sortState().direction === 'desc'"
+              aria-hidden="true"></i>
+          </th>
+        } @else {
+          <th [style.width]="column.width">{{ column.headerKey | translate }}</th>
+        }
+      }
+      @if (visibleActions().length) {
+        <th class="actions-col"><span class="sr-only">{{ 'table.actions' | translate }}</span></th>
+      }
+    </tr>
+  </ng-template>
+
+  <ng-template #body let-row let-rowIndex="rowIndex">
+    <tr>
+      @for (column of columns(); track column.key) {
+        <td [attr.data-label]="column.headerKey | translate">
+          @switch (column.type) {
+            @case ('datetime') {
+              {{ $any(cellValue(row, column, rowIndex)) | utcDateTime }}
+            }
+            @case ('translated') {
+              {{ $any(cellValue(row, column, rowIndex)) | translate }}
+            }
+            @case ('active') {
+              <s2s-status-tag [active]="!!cellValue(row, column, rowIndex)" />
+            }
+            @case ('status') {
+              <s2s-status-tag [status]="$any(cellValue(row, column, rowIndex))" />
+            }
+            @default {
+              @if (column.link) {
+                <a [routerLink]="column.link(row)">{{ cellValue(row, column, rowIndex) }}</a>
+              } @else {
+                {{ cellValue(row, column, rowIndex) }}
+              }
+            }
+          }
+        </td>
+      }
+      @if (visibleActions().length) {
+        <td class="actions-col">
+          @for (action of visibleActions(); track action.labelKey) {
+            @if (isVisible(action, row)) {
+              <p-button
+                [icon]="action.icon"
+                [text]="true"
+                [rounded]="true"
+                [severity]="action.severity ?? 'secondary'"
+                [ariaLabel]="action.labelKey | translate"
+                [attr.title]="action.labelKey | translate"
+                (onClick)="action.run(row)" />
+            }
+          }
+        </td>
+      }
+    </tr>
+  </ng-template>
+
+  <ng-template #emptymessage>
+    <tr>
+      <td [attr.colspan]="colspan()" class="empty-cell">
+        @if (state() !== 'loading') {
+          <s2s-empty-state [messageKey]="state() === 'error' ? 'table.loadFailed' : emptyKey()" />
+        }
+      </td>
+    </tr>
+  </ng-template>
+</p-table>

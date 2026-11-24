@@ -1,0 +1,123 @@
+@if (!embedded()) {
+  <s2s-page-header [heading]="'movements.title' | translate" [subtitle]="context()?.jobNumber ?? ''">
+    <a [routerLink]="['/jobs', jobId()]">{{ 'movements.job' | translate }}</a>
+    <a [routerLink]="['/jobs', jobId(), 'recovery']">{{ 'movements.recovery' | translate }}</a>
+  </s2s-page-header>
+} @else {
+  <p><a [routerLink]="['/jobs', jobId(), 'recovery']">{{ 'movements.recovery' | translate }} →</a></p>
+}
+@if (errorKey(); as error) { <p-message severity="error" role="alert" [text]="error | translate" /> }
+@if (context(); as ctx) {
+  @if (!embedded()) { <p>{{ 'movements.zone' | translate: { zone: ctx.timeZone } }}</p> }
+  @if (canWrite() && (editing() || !hasActiveDeparture())) {
+    <section class="s2s-panel" aria-labelledby="movement-form-heading">
+      <h2 id="movement-form-heading">{{ (editing() ? 'movements.correct' : 'movements.dispatch') | translate }}</h2>
+      <form (ngSubmit)="save()" class="fields">
+        <div><label for="movement-departed">{{ 'movements.departed' | translate }}</label>
+          <s2s-date-time-picker inputId="movement-departed" name="departed" [(ngModel)]="form.departedLocal" [localString]="true" required />
+        </div>
+        @if (editing()) {
+          <div><label for="movement-returned">{{ 'movements.returned' | translate }}</label>
+            <s2s-date-time-picker inputId="movement-returned" name="returned" [(ngModel)]="form.returnedLocal" [localString]="true" [clearable]="true" />
+          </div>
+          <label class="wide">{{ 'movements.reason' | translate }}<textarea name="reason" [(ngModel)]="form.reason" rows="2" required></textarea></label>
+        } @else {
+          <label class="check wide"><input type="checkbox" name="confirmedDeparture" [(ngModel)]="confirmedDeparture" />
+            {{ 'movements.confirmDeparture' | translate }}</label>
+        }
+        <div class="actions wide"><button type="submit" [disabled]="busy() || !form.departedLocal || (!editing() && !confirmedDeparture)">{{ (editing() ? 'common.save' : 'movements.dispatch') | translate }}</button>
+          @if (editing()) { <button type="button" (click)="edit(null)">{{ 'common.cancel' | translate }}</button> }</div>
+      </form>
+    </section>
+  }
+
+  <section class="s2s-panel" aria-labelledby="clock-heading">
+    <h2 id="clock-heading">{{ 'movements.clock' | translate }}</h2>
+    @if (clock(); as c) {
+      <dl class="facts">
+        <div><dt>{{ 'movements.basis' | translate }}</dt><dd>{{ c.clock.basisHours }} h</dd></div>
+        <div><dt>{{ 'movements.start' | translate }}</dt><dd>{{ display(c.clock.startAt) }}</dd></div>
+        <div><dt>{{ 'movements.stop' | translate }}</dt><dd>{{ display(c.clock.stopAt) }}</dd></div>
+        <div><dt>{{ 'movements.expiry' | translate }}</dt><dd>{{ display(c.expiryAt) }}</dd></div>
+        <div><dt>{{ 'movements.elapsed' | translate }}</dt><dd>{{ c.clock.elapsedHours ?? '—' }} h</dd></div>
+        <div><dt>{{ 'movements.extra' | translate }}</dt><dd>{{ c.clock.extraHours ?? '—' }} h</dd></div>
+        <div><dt>{{ 'movements.countdown' | translate }}</dt><dd>@if (remaining() !== null) {
+          {{ remaining()! < 0 ? ('movements.exceeded' | translate) : ('movements.remaining' | translate) }}
+          {{ (remaining()! < 0 ? -remaining()! : remaining()!) }} min
+        } @else { — }</dd></div>
+        <div><dt>{{ 'movements.forecast' | translate }}</dt><dd>{{ display(c.forecastCompletion) }}</dd></div>
+        <div><dt>{{ 'movements.adjustment' | translate }}</dt><dd>{{ c.approvedAdjustmentHours }} h</dd></div>
+        <div><dt>{{ 'movements.terms' | translate }}</dt><dd>{{ 'movements.' + c.clock.tariffTermsStatus | translate }}</dd></div>
+        <div><dt>{{ 'movements.units' | translate }}</dt><dd>{{ c.clock.billableExtraUnits ?? '—' }}</dd></div>
+        <div><dt>{{ 'movements.charge' | translate }}</dt><dd>{{ c.clock.additionalCharge ?? '—' }} {{ c.clock.currency }}</dd></div>
+      </dl>
+      @if (!c.clock.final) { <p-message severity="warn" [text]="'movements.ongoing' | translate" /> }
+      @if (c.exceeded && !c.clock.stopAt) {
+        <p-message severity="error" role="alert" [text]="'movements.mooringNotDoneAlert' | translate: { hours: c.clock.basisHours }" />
+      }
+      @if (canApprove() && c.selection) {
+        <div class="fields compact"><label>{{ 'movements.basis' | translate }}<select [(ngModel)]="basis.hours">
+          <option [ngValue]="24">24 h</option><option [ngValue]="48">48 h</option><option [ngValue]="72">72 h</option>
+        </select></label><label>{{ 'movements.reason' | translate }}<input [(ngModel)]="basis.reason" /></label>
+        <button type="button" (click)="overrideBasis()" [disabled]="!basis.reason.trim()">{{ 'movements.override' | translate }}</button></div>
+      }
+      @if (canWrite() && c.selection) { <div class="fields compact">
+        <label>{{ 'movements.adjustment' | translate }}<input type="number" step="0.0001" [(ngModel)]="adjustment.hours" /></label>
+        <label>{{ 'movements.reason' | translate }}<input [(ngModel)]="adjustment.reason" /></label>
+        <button type="button" (click)="adjust()" [disabled]="!adjustment.reason.trim() || !adjustment.hours">{{ 'movements.requestAdjustment' | translate }}</button>
+      </div> }
+      @for (a of c.adjustments; track a.id) { <p>{{ a.hours }} h · {{ a.status }} · {{ a.reason }}</p>
+        @if (a.status === 'PENDING' && canApprove()) { <div class="actions">
+          <button type="button" (click)="decideAdjustment(a.id, 'APPROVE')" [disabled]="!decisionReason.trim()">{{ 'movements.approve' | translate }}</button>
+          <button type="button" (click)="decideAdjustment(a.id, 'RETURN')" [disabled]="!decisionReason.trim()">{{ 'movements.returnDecision' | translate }}</button></div> }
+      }
+      @if (canWrite() || canApprove()) { <label>{{ 'movements.decisionReason' | translate }}<textarea [(ngModel)]="decisionReason" rows="2"></textarea></label> }
+      @if (c.notice; as n) { <h3>{{ 'movements.notice' | translate }} · {{ n.status }}</h3>
+        @if (n.status === 'DRAFT' && canApprove()) { <button type="button" (click)="release()">{{ 'movements.release' | translate }}</button> }
+        @if (n.status === 'RELEASED' && canWrite()) { <label>{{ 'movements.delivery' | translate }}<input [(ngModel)]="deliveryOutcome" /></label>
+          <button type="button" (click)="delivery()" [disabled]="!deliveryOutcome.trim()">{{ 'common.save' | translate }}</button> }
+        @if (n.deliveryOutcome) { <p>{{ n.deliveryOutcome }}</p> }
+      }
+    }
+  </section>
+
+  <section class="s2s-panel" aria-labelledby="trips-heading"><h2 id="trips-heading">{{ 'movements.trips' | translate }}</h2>
+    <div class="cards">@for (row of rows(); track row.id) { <article class="card">
+      <h3>{{ 'movements.departed' | translate }} · {{ display(row.departedAt) }}</h3>
+      <p>{{ 'movements.departed' | translate }}: {{ display(row.departedAt) }}</p>
+      <p>{{ 'movements.returned' | translate }}: {{ display(row.returnedAt) }}</p>
+      <p>{{ 'movements.carrying' | translate }}: @for (a of row.assets; track a.allocationId) { {{ a.identifier }} ({{ a.category }}) } </p>
+      @if (row.serviceNotes) { <p>{{ 'movements.serviceNotes' | translate }}: {{ row.serviceNotes }}</p> }
+      @if (row.delayNotes) { <p>{{ 'movements.delayNotes' | translate }}: {{ row.delayNotes }}</p> }
+      @if (row.damageNotes) { <p>{{ 'movements.damageNotes' | translate }}: {{ row.damageNotes }}</p> }
+      <p>{{ row.status }}</p>
+      @if (row.pendingAction) { <p-message severity="warn" [text]="'movements.pendingMovement' | translate: { action: row.pendingAction }" /> }
+      @if (row.pendingReason) { <p>{{ 'movements.reason' | translate }}: {{ row.pendingReason }}</p> }
+      @for (file of row.files; track file.id) { <p>{{ file.name }} · {{ file.scanState }}</p> }
+      @if (row.returnedAt) {
+        <label class="check"><input type="checkbox" [checked]="true" disabled /> {{ 'movements.confirmReturn' | translate }}</label>
+      }
+      @if (canWrite() && row.status === 'ACTIVE' && !row.pendingAction) { <div class="actions">
+        @if (!row.returnedAt) {
+          <label class="check"><input type="checkbox" [checked]="false" [disabled]="busy()" (change)="checkReturned(row, $any($event.target).checked)" />
+            {{ 'movements.confirmReturn' | translate }}</label>
+          <div><label [for]="'return-' + row.id">{{ 'movements.returned' | translate }}</label>
+            <s2s-date-time-picker [inputId]="'return-' + row.id" [(ngModel)]="returnLocal" [localString]="true" /></div>
+          <button type="button" (click)="returned(row)" [disabled]="!returnLocal">{{ 'movements.recordReturn' | translate }}</button>
+        }
+        <button type="button" (click)="edit(row)">{{ 'movements.correct' | translate }}</button>
+        <button type="button" (click)="void(row)" [disabled]="!decisionReason.trim()">{{ 'movements.void' | translate }}</button>
+        <label>{{ 'movements.evidence' | translate }}<input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="file(row, $event)" /></label>
+      </div> }
+      @if (canApproveChange() && row.pendingAction) {
+        @if (!canApprove()) { <label>{{ 'movements.decisionReason' | translate }}<textarea [(ngModel)]="decisionReason" rows="2"></textarea></label> }
+        <div class="actions">
+        <button type="button" (click)="decideMovement(row, 'APPROVE')" [disabled]="!decisionReason.trim()">{{ 'movements.approve' | translate }}</button>
+        <button type="button" (click)="decideMovement(row, 'RETURN')" [disabled]="!decisionReason.trim()">{{ 'movements.returnDecision' | translate }}</button>
+        </div>
+      }
+    </article> } @empty { <p>{{ 'movements.noTrips' | translate }}</p> }</div>
+    @if (total() > 25) { <div class="actions"><button type="button" (click)="loadPage(page() - 1)" [disabled]="page() === 0">{{ 'movements.previous' | translate }}</button>
+      <button type="button" (click)="loadPage(page() + 1)" [disabled]="(page() + 1) * 25 >= total()">{{ 'movements.next' | translate }}</button></div> }
+  </section>
+}

@@ -1,0 +1,44 @@
+<header class="topbar">
+  <p-button
+    class="menu-toggle"
+    icon="pi pi-bars"
+    [text]="true"
+    severity="contrast"
+    [ariaLabel]="'nav.toggleMenu' | translate"
+    [attr.aria-expanded]="navOpen()"
+    (onClick)="toggleNav.emit()" />
+
+  <a class="brand" routerLink="/dashboard">
+    <span class="brand-logo" aria-hidden="true"><img src="/s2s-logo.png" alt="" /></span>
+    <span class="brand-name">Ship2Ship</span>
+  </a>
+
+  <div class="spacer"></div>
+
+  @if (language.options.length > 1) {
+    <p-select
+      class="language"
+      [options]="language.options"
+      optionLabel="label"
+      optionValue="code"
+      [ngModel]="language.current()"
+      (ngModelChange)="changeLanguage($event)"
+      [ariaLabel]="'nav.language' | translate" />
+  }
+
+  @if (user(); as current) {
+    <a class="user" routerLink="/profile" [title]="'users.myProfile' | translate" [attr.aria-label]="'users.myProfile' | translate">
+      <span class="user-avatar"><i class="pi pi-user" aria-hidden="true"></i></span>
+      <span class="user-name">{{ current.fullName }}</span>
+    </a>
+  }
+
+  <p-button
+    icon="pi pi-sign-out"
+    [label]="'auth.signOut' | translate"
+    [ariaLabel]="'auth.signOut' | translate"
+    [text]="true"
+    severity="contrast"
+    class="sign-out"
+    (onClick)="signOut()" />
+</header>

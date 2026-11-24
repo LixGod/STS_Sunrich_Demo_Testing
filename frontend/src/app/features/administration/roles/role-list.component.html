@@ -1,0 +1,39 @@
+<s2s-page-header [heading]="'nav.roles' | translate" [subtitle]="'roles.subtitle' | translate" />
+
+@if (error()) { <p class="s2s-panel" role="alert">{{ error() }}</p> }
+@if (loading()) { <p class="s2s-muted">{{ 'common.loading' | translate }}</p> }
+
+@if (canWrite() && editing() === undefined && !error()) {
+  <button type="button" class="role-action" (click)="edit(null)">{{ 'roles.new' | translate }}</button>
+}
+
+@if (editing() !== undefined) {
+  <form class="s2s-panel editor" (ngSubmit)="save()">
+    <h2>{{ (editing() ? 'roles.edit' : 'roles.new') | translate }}</h2>
+    @if (!editing()) {
+      <label for="role-code">{{ 'roles.code' | translate }}</label>
+      <input id="role-code" name="code" [(ngModel)]="code" required pattern="[A-Z][A-Z0-9_]{1,39}" maxlength="40" />
+    }
+    <label for="role-name">{{ 'roles.name' | translate }}</label>
+    <input id="role-name" name="name" [(ngModel)]="name" required maxlength="100" />
+    <label for="role-description">{{ 'roles.description' | translate }}</label>
+    <textarea id="role-description" name="description" [(ngModel)]="description" maxlength="500"></textarea>
+    <div class="actions">
+      <button type="submit" [disabled]="saving() || !name.trim()">{{ 'common.save' | translate }}</button>
+      <button type="button" (click)="editing.set(undefined)">{{ 'common.cancel' | translate }}</button>
+    </div>
+  </form>
+}
+
+<div class="roles">
+  @for (role of roles(); track role.id) {
+    <section class="s2s-panel role">
+      <h2>{{ role.name }}</h2>
+      <p class="s2s-muted">{{ role.description }}</p>
+      <p><code>{{ role.code }}</code></p>
+      @if (canWrite() && role.code !== 'SYSTEM_ADMIN') {
+        <button type="button" (click)="edit(role)">{{ 'common.edit' | translate }}</button>
+      }
+    </section>
+  }
+</div>

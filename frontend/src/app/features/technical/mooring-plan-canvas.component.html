@@ -1,0 +1,56 @@
+<div class="canvas-toolbar" [attr.aria-label]="'mooring.canvasControls' | translate">
+  <button type="button" (click)="zoom(0.8)" [attr.aria-label]="'mooring.zoomIn' | translate">+</button>
+  <button type="button" (click)="zoom(1.25)" [attr.aria-label]="'mooring.zoomOut' | translate">−</button>
+  <button type="button" (click)="pan(-20)" [attr.aria-label]="'mooring.panLeft' | translate">←</button>
+  <button type="button" (click)="pan(20)" [attr.aria-label]="'mooring.panRight' | translate">→</button>
+</div>
+<svg [attr.viewBox]="viewBox()" preserveAspectRatio="xMidYMid meet" role="img" [attr.aria-label]="'mooring.drawing' | translate">
+  <line x1="0" y1="-100" x2="0" y2="100" class="manifold" />
+  <text x="2" y="-86" class="caption">{{ 'mooring.centerManifold' | translate }}</text>
+  @for (layer of model().layers; track layer.id) {
+    @if (layer.visible && layerUrls()[layer.documentVersionId]; as url) {
+      <image [attr.href]="url" [attr.x]="layer.xM" [attr.y]="layer.yM" [attr.width]="100 * layer.scale" [attr.height]="60 * layer.scale" opacity="0.45" />
+    }
+  }
+  @for (layout of model().vessels; track layout.jobVesselId) {
+    @if (rect(layout.jobVesselId); as r) {
+      <rect class="vessel" [attr.x]="r.x" [attr.y]="r.y" [attr.width]="r.width" [attr.height]="r.height" />
+      <text class="caption" [attr.x]="r.x" [attr.y]="r.y - 3">{{ vessel(layout.jobVesselId)?.name }} · {{ layout.heading }}</text>
+    } @else {
+      <text class="caption" x="-185" [attr.y]="layout.jobVesselId === snapshot().vessels[0]?.jobVesselId ? -50 : 50">
+        {{ vessel(layout.jobVesselId)?.role }}: {{ 'mooring.dimensionsMissing' | translate }}
+      </text>
+    }
+  }
+  @for (line of model().lines; track line.id) {
+    @if (point(line.fromPointId); as from) {
+      @if (point(line.toPointId); as to) {
+        <line class="mooring-line" [attr.x1]="from.xM" [attr.y1]="from.yM" [attr.x2]="to.xM" [attr.y2]="to.yM" />
+        <text class="caption" [attr.x]="(from.xM + to.xM) / 2" [attr.y]="(from.yM + to.yM) / 2 - 2">{{ line.label }}</text>
+      }
+    }
+  }
+  @for (obj of model().objects; track obj.id) {
+    <g role="button" tabindex="0" [attr.aria-label]="obj.label || obj.type" (pointerdown)="start($event, obj)"
+      (pointerup)="end($event)" (keydown)="keyMove($event, obj)">
+      @switch (obj.type) {
+        @case ('PRIMARY_FENDER') { <ellipse class="symbol fender" [attr.cx]="obj.xM" [attr.cy]="obj.yM" rx="6" ry="3" /> }
+        @case ('SECONDARY_FENDER') { <ellipse class="symbol fender" [attr.cx]="obj.xM" [attr.cy]="obj.yM" rx="3" ry="2" /> }
+        @case ('TUG') { <path class="symbol craft" [attr.d]="'M ' + (obj.xM - 6) + ' ' + (obj.yM - 2) + ' L ' + (obj.xM + 5) + ' ' + (obj.yM - 2) + ' L ' + (obj.xM + 3) + ' ' + (obj.yM + 3) + ' L ' + (obj.xM - 4) + ' ' + (obj.yM + 3) + ' Z'" /> }
+        @case ('STS_SUPPORT_CRAFT') { <path class="symbol craft" [attr.d]="'M ' + obj.xM + ' ' + (obj.yM - 5) + ' L ' + (obj.xM + 5) + ' ' + (obj.yM + 4) + ' L ' + (obj.xM - 5) + ' ' + (obj.yM + 4) + ' Z'" /> }
+        @case ('CONSTANT_HEADING_MOORING') { <rect class="symbol mooring" [attr.x]="obj.xM - 3" [attr.y]="obj.yM - 3" width="6" height="6" /> }
+        @case ('MANOEUVRING_MOORING') { <path class="symbol mooring" [attr.d]="'M ' + obj.xM + ' ' + (obj.yM - 4) + ' L ' + (obj.xM + 4) + ' ' + obj.yM + ' L ' + obj.xM + ' ' + (obj.yM + 4) + ' L ' + (obj.xM - 4) + ' ' + obj.yM + ' Z'" /> }
+        @case ('FENDER_MOORING') { <circle class="symbol mooring" [attr.cx]="obj.xM" [attr.cy]="obj.yM" r="3" /> }
+        @case ('ANNOTATION') { <text class="annotation" [attr.x]="obj.xM" [attr.y]="obj.yM">{{ obj.label }}</text> }
+        @default { <circle class="symbol point" [attr.cx]="obj.xM" [attr.cy]="obj.yM" r="3" /> }
+      }
+      @if (selected() === obj.id) { <circle class="selection" [attr.cx]="obj.xM" [attr.cy]="obj.yM" r="7" /> }
+      <text class="caption" [attr.x]="obj.xM + 4" [attr.y]="obj.yM - 4">{{ obj.label || obj.type }}</text>
+    </g>
+  }
+  <line x1="-180" y1="86" x2="180" y2="86" class="ruler" />
+  @for (tick of rulerTicks(); track tick) {
+    <line [attr.x1]="tick" y1="83" [attr.x2]="tick" y2="89" class="ruler" />
+    <text class="tick" [attr.x]="tick" y="95">{{ tick }}</text>
+  }
+</svg>

@@ -1,0 +1,186 @@
+<s2s-page-header [heading]="embedded() ? ('enquiry.tabs.estimate' | translate) : (enquiry()?.reference ?? ('estimate.title' | translate))" [subtitle]="enquiry()?.client?.name">
+  @if (enquiry(); as current) {
+    <s2s-status-tag [status]="current.status" />
+  }
+</s2s-page-header>
+
+@if (!embedded()) { <s2s-enquiry-tabs [enquiryId]="id()" /> }
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+@if (equipmentLoadError()) {
+  <p-message severity="error" role="alert" [text]="'estimate.equipmentLoadFailed' | translate" />
+}
+
+@if (!loading() && versions().length === 0) {
+  <section class="s2s-panel empty">
+    <s2s-empty-state messageKey="estimate.empty" icon="pi pi-calculator" />
+    @if (canWrite()) {
+      <p-button [label]="'estimate.start' | translate" icon="pi pi-plus" [loading]="saving()" (onClick)="newVersion()" />
+    }
+  </section>
+} @else if (estimate(); as current) {
+  <section class="s2s-panel toolbar" [attr.aria-busy]="loading()">
+    <s2s-form-field labelKey="estimate.version" fieldId="estimate-version">
+      <p-select
+        inputId="estimate-version"
+        [options]="versionOptions()"
+        optionLabel="label"
+        optionValue="value"
+        [ngModel]="current.id"
+        (ngModelChange)="selectVersion($event)" />
+    </s2s-form-field>
+    @if (canWrite()) {
+      <p-button
+        [label]="'estimate.newVersion' | translate"
+        icon="pi pi-copy"
+        [outlined]="true"
+        [loading]="saving()"
+        [title]="'estimate.newVersionHint' | translate"
+        (onClick)="newVersion()" />
+    }
+  </section>
+
+    @if (current.locked && !editable()) {
+      <p-message severity="info" [text]="'estimate.locked' | translate" />
+    } @else if (!editable()) {
+      <p-message severity="info" [text]="'estimate.readOnly' | translate" />
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate class="sections">
+    <section class="s2s-panel">
+      <div class="s2s-form-grid">
+        <s2s-form-field labelKey="estimate.currency" fieldId="currency" [control]="form.controls.currency" [required]="true">
+          <p-select inputId="currency" formControlName="currency" [options]="currencies()" optionLabel="label" optionValue="value"
+            [filter]="true" filterBy="label" (onChange)="currencyChanged($event.value)" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="quotation.tariff" fieldId="estimate-tariff" [control]="form.controls.tariffId">
+          <p-select inputId="estimate-tariff" formControlName="tariffId" [options]="tariffOptions()" optionLabel="label" optionValue="value"
+            [showClear]="true" [placeholder]="'common.select' | translate" (onChange)="tariffChanged()" />
+        </s2s-form-field>
+        @if (form.controls.currency.value === 'USD') {
+          <s2s-form-field labelKey="estimate.inrFxRate" fieldId="estimate-inr-rate" [control]="form.controls.inrFxRate" hintKey="estimate.inrFxRateHint">
+            <p-inputnumber inputId="estimate-inr-rate" name="inrFxRate" formControlName="inrFxRate" mode="decimal" inputmode="decimal"
+              [minFractionDigits]="2" [maxFractionDigits]="8" [min]="0.0001" />
+          </s2s-form-field>
+        }
+        <s2s-form-field class="s2s-span-2" labelKey="estimate.notes" fieldId="estimate-notes" [control]="form.controls.notes">
+          <textarea pTextarea id="estimate-notes" formControlName="notes" rows="2" maxlength="2000"></textarea>
+        </s2s-form-field>
+      </div>
+    </section>
+
+    @for (kind of lineKinds; track kind) {
+    <section class="s2s-panel">
+      <div class="section-head">
+        <h2>{{ (kind === 'COST' ? 'estimate.costLines' : 'estimate.revenueLines') | translate }}</h2>
+        @if (editable()) {
+          <div class="add">
+            <p-button type="button" [label]="(kind === 'COST' ? 'estimate.addCost' : 'estimate.addRevenue') | translate"
+              icon="pi pi-plus" [outlined]="true" size="small" [disabled]="rows.length >= maxLines" (onClick)="addLine(kind)" />
+          </div>
+        }
+      </div>
+      @if (!hasLines(kind)) {
+        <p class="s2s-muted">{{ (kind === 'COST' ? 'estimate.noCostLines' : 'estimate.noRevenueLines') | translate }}</p>
+      }
+      <div class="lines" formArrayName="lines">
+        @for (row of rows; track row; let i = $index) {
+          @if (row.controls.kind.value === kind) {
+          <div class="line" [class.revenue]="row.controls.kind.value === 'REVENUE'"
+            [class.additional-tariff]="isAdditionalTariffRevenueLine(row)"
+            [class.extra-hours]="row.controls.extraHours.value"
+            [class.equipment-selected]="row.controls.equipmentModelId.value"
+            [class.equipment-head-set]="equipmentHasCostHead(row)" [formGroupName]="i">
+            @if (row.controls.kind.value === 'COST') {
+              <s2s-form-field class="equipment" labelKey="estimate.equipment" [fieldId]="'equip-' + i" [control]="row.controls.equipmentModelId">
+                <p-select [inputId]="'equip-' + i" formControlName="equipmentModelId" [options]="equipmentOptions()" optionLabel="label" optionValue="value"
+                  [filter]="true" filterBy="label" [showClear]="true" [placeholder]="'estimate.noEquipment' | translate"
+                  [emptyMessage]="'estimate.noEquipmentOptions' | translate" />
+              </s2s-form-field>
+            }
+            @if (!row.controls.equipmentModelId.value) {
+              <s2s-form-field labelKey="estimate.kind" [fieldId]="'kind-' + i" [control]="row.controls.kind">
+                <p-select [inputId]="'kind-' + i" formControlName="kind" [options]="kindOptions()" optionLabel="label" optionValue="value" />
+              </s2s-form-field>
+            }
+            @if (!row.controls.equipmentModelId.value || !equipmentHasCostHead(row)) {
+              <s2s-form-field labelKey="estimate.costHead" [fieldId]="'head-' + i" [control]="row.controls.costHeadId">
+                <p-select [inputId]="'head-' + i" formControlName="costHeadId" [options]="headsFor()[row.controls.kind.value]"
+                  optionLabel="label" optionValue="value" [filter]="true" filterBy="label" [placeholder]="'common.select' | translate" />
+              </s2s-form-field>
+            }
+            @if (isAdditionalTariffRevenueLine(row)) {
+              <div class="extra-hours-toggle">
+                <input
+                  type="checkbox"
+                  [id]="'extra-hours-' + i"
+                  [name]="'extraHours-' + i"
+                  [checked]="row.controls.extraHours.value"
+                  [disabled]="!editable() || (!row.controls.extraHours.value && extraHoursEnabled())"
+                  [attr.aria-expanded]="row.controls.extraHours.value"
+                  [attr.aria-controls]="'qty-' + i"
+                  (change)="toggleRowExtraHours(row, $any($event.target).checked)" />
+                <label [for]="'extra-hours-' + i">
+                  {{ 'estimate.extraHours' | translate }}
+                  @if (baseHours(); as hours) {
+                    <span class="s2s-muted">({{ 'estimate.extraHoursBeyond' | translate: { hours } }})</span>
+                  }
+                </label>
+              </div>
+            }
+            @if (showLineQuantity(row)) {
+              <s2s-form-field [labelKey]="row.controls.extraHours.value ? 'estimate.additionalHours' : 'estimate.quantity'" [fieldId]="'qty-' + i" [control]="row.controls.quantity">
+                <p-inputnumber [inputId]="'qty-' + i" formControlName="quantity" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="3" [min]="0" />
+              </s2s-form-field>
+            }
+            <s2s-form-field [labelKey]="isAdditionalTariffRevenueLine(row) ? 'estimate.extraHourRate' : 'estimate.unitPrice'" [fieldId]="'price-' + i" [control]="row.controls.unitPrice">
+              <p-inputnumber [inputId]="'price-' + i" formControlName="unitPrice" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="4" [min]="0" />
+            </s2s-form-field>
+            <div class="amount">
+              <span class="label">{{ 'estimate.amount' | translate }}</span>
+              <output [attr.for]="showLineQuantity(row) ? 'qty-' + i + ' price-' + i : null">{{ amountOf(row) | money: form.controls.currency.value }}</output>
+            </div>
+            @if (editable()) {
+              <p-button type="button" class="remove" icon="pi pi-trash" [text]="true" severity="danger"
+                [ariaLabel]="'estimate.removeLine' | translate" (onClick)="removeLine(i)" />
+            }
+          </div>
+          }
+        }
+      </div>
+    </section>
+    }
+
+    <section class="s2s-panel">
+      <h2>{{ 'estimate.summary' | translate }}</h2>
+      <dl class="totals" aria-live="polite">
+        <div><dt>{{ 'estimate.totalCost' | translate }}</dt><dd>{{ totals().cost | money: form.controls.currency.value }}</dd></div>
+        <div><dt>{{ 'estimate.totalRevenue' | translate }}</dt><dd>{{ totals().revenue | money: form.controls.currency.value }}</dd></div>
+        <div><dt>GST (18%)</dt><dd>{{ totals().revenue.times('0.18') | money: form.controls.currency.value }}</dd></div>
+        <div class="margin" [class.negative]="totals().margin.lt(0)">
+          <dt>{{ 'estimate.margin' | translate }}</dt>
+          <dd>
+            {{ totals().margin | money: form.controls.currency.value }}
+            @if (totals().marginPercent; as percent) {
+              ({{ percent.toFixed(2) }}%)
+            }
+          </dd>
+        </div>
+      </dl>
+      <p class="s2s-muted hint">{{ 'estimate.totalsHint' | translate }}</p>
+
+      @if (editable()) {
+        <div class="s2s-actions">
+          <p-button type="submit" [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" [disabled]="loading()" />
+        </div>
+      }
+    </section>
+    </form>
+}

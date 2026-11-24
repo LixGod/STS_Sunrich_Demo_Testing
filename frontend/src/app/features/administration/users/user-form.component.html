@@ -1,0 +1,190 @@
+<s2s-page-header [heading]="record() ? (record()?.fullName || ('users.draftUser' | translate)) : ('users.new' | translate)" [subtitle]="record()?.workEmail">
+  @if (record(); as user) {
+    <s2s-status-tag [status]="user.status" />
+    @if (canManageAccess()) {
+      @if (user.status === 'ACTIVE') {
+        <p-button [label]="'users.suspend' | translate" severity="warn" [outlined]="true" (onClick)="pendingStatus.set('SUSPENDED')" />
+        <p-button [label]="'users.deactivate' | translate" severity="secondary" [outlined]="true" [loading]="saving()" (onClick)="changeStatus('DEACTIVATED', null)" />
+      } @else {
+        <p-button [label]="'users.reactivate' | translate" severity="success" [outlined]="true" [loading]="saving()" [disabled]="!user.externalSubjectId" (onClick)="changeStatus('ACTIVE', null)" />
+      }
+    }
+    @if (canManageModuleAccess()) {
+      <p-button label="Delete user" icon="pi pi-trash" severity="danger" [outlined]="true" [loading]="deleting()" (onClick)="deleteUser()" />
+    }
+  }
+</s2s-page-header>
+
+@if (isSelf()) {
+  <p-message severity="info" class="form-message" [text]="'users.selfNotice' | translate" />
+}
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" class="form-message">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+
+<form class="s2s-panel" [formGroup]="form" (ngSubmit)="save()" novalidate [attr.aria-busy]="loading()">
+  <h2 class="section-title">{{ 'users.account' | translate }}</h2>
+  <div class="s2s-form-grid">
+    <s2s-form-field labelKey="users.fullName" fieldId="fullName" [control]="form.controls.fullName">
+      <input pInputText id="fullName" formControlName="fullName" maxlength="150" autocomplete="off" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.workEmail" fieldId="workEmail" [control]="form.controls.workEmail">
+      <input pInputText id="workEmail" type="email" formControlName="workEmail" maxlength="254" autocomplete="off" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.department" fieldId="department" [control]="form.controls.department">
+      <input pInputText id="department" formControlName="department" maxlength="80" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.position" fieldId="position" [control]="form.controls.position">
+      <input pInputText id="position" formControlName="position" maxlength="80" />
+    </s2s-form-field>
+    <s2s-form-field labelKey="users.subject" fieldId="externalSubjectId" [control]="form.controls.externalSubjectId" hintKey="users.subjectHint">
+      <input pInputText id="externalSubjectId" formControlName="externalSubjectId" maxlength="128" autocomplete="off" />
+    </s2s-form-field>
+    @if (record(); as user) {
+      <div class="facts">
+        <span>{{ 'users.lastLogin' | translate }}: {{ user.lastLoginAt ? (user.lastLoginAt | utcDateTime) : ('users.never' | translate) }}</span>
+        <span>{{ 'users.mfa' | translate }}: {{ (user.mfaEnabled ? 'common.yes' : 'common.no') | translate }}</span>
+      </div>
+    }
+  </div>
+
+  @if (canWrite()) {
+    <div class="s2s-actions">
+      <p-button type="submit" [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" [disabled]="loading()" />
+    </div>
+  }
+</form>
+
+@if (record() && canManageModuleAccess()) {
+  <form class="s2s-panel" [formGroup]="passwordForm" (ngSubmit)="setPassword()" novalidate>
+    <h2 class="section-title">Sign-in password</h2>
+    <p class="s2s-muted">Sign in using the Authentication subject ID and this password. Leave the account active to allow access.</p>
+    @if (passwordError(); as error) { <p-message severity="error" role="alert" [text]="error" /> }
+    <div class="s2s-form-grid">
+      <s2s-form-field labelKey="auth.password" fieldId="userPassword" [control]="passwordForm.controls.password">
+        <input pInputText id="userPassword" type="password" formControlName="password" autocomplete="new-password" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="users.confirmPassword" fieldId="confirmPassword" [control]="passwordForm.controls.confirmPassword">
+        <input pInputText id="confirmPassword" type="password" formControlName="confirmPassword" autocomplete="new-password" />
+      </s2s-form-field>
+    </div>
+    <div class="s2s-actions"><p-button type="submit" label="Set password" [loading]="savingPassword()" [disabled]="!record()?.externalSubjectId" /></div>
+  </form>
+}
+
+@if (record()) {
+  <section class="s2s-panel">
+    <h2 class="section-title">{{ 'users.roleGrants' | translate }}</h2>
+    <p class="s2s-muted">{{ 'users.roleGrantsHelp' | translate }}</p>
+
+    @if (grantsErrorKey(); as key) {
+      <p-message severity="error" role="alert" class="form-message" [text]="key | translate" />
+    }
+
+    <div class="grants">
+      @for (grant of grants.controls; track grant; let i = $index) {
+        <div class="grant" [formGroup]="grant">
+          <s2s-form-field labelKey="users.role" [fieldId]="'role-' + i" [control]="grant.controls.roleId" [required]="true">
+            <p-select [inputId]="'role-' + i" formControlName="roleId" [options]="roleOptions()" optionLabel="label" optionValue="value" [placeholder]="'common.select' | translate" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="masters.branch.single" [fieldId]="'branch-' + i">
+            <p-select [inputId]="'branch-' + i" formControlName="branchId" [options]="branchOptions()" optionLabel="label" optionValue="value" [showClear]="true" [placeholder]="'users.wholeEntity' | translate" />
+          </s2s-form-field>
+          <s2s-form-field labelKey="users.validTo" [fieldId]="'valid-to-' + i">
+            <p-datepicker [inputId]="'valid-to-' + i" formControlName="validTo" [showButtonBar]="true" dateFormat="yy-mm-dd" [placeholder]="'users.noEndDate' | translate" />
+          </s2s-form-field>
+          @if (canManageAccess()) {
+            <p-button class="remove" icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'users.removeGrant' | translate" (onClick)="removeGrant(i)" />
+          }
+        </div>
+      } @empty {
+        <p class="s2s-muted">{{ 'users.noGrants' | translate }}</p>
+      }
+    </div>
+
+    @if (canManageAccess()) {
+      <div class="s2s-actions">
+        <p-button [label]="'users.addGrant' | translate" icon="pi pi-plus" [outlined]="true" (onClick)="addGrant()" />
+        <p-button [label]="'users.saveGrants' | translate" icon="pi pi-check" [loading]="savingGrants()" [disabled]="grants.pristine" (onClick)="saveGrants()" />
+      </div>
+    }
+  </section>
+
+  <section class="s2s-panel">
+    <h2 class="section-title">{{ 'users.moduleAccess' | translate }}</h2>
+    <p class="s2s-muted">{{ 'users.moduleAccessHelp' | translate }}</p>
+    @if (permissionErrorKey(); as key) {
+      <p-message severity="error" role="alert" class="form-message" [text]="key | translate" />
+    }
+    @for (group of permissionGroups(); track group.name) {
+      <details class="permission-group" open>
+        <summary>
+          <div class="group-summary-content">
+            <div class="group-title-row">
+              <span class="group-name">{{ group.name }}</span>
+              <span class="group-count" [class.has-active]="groupActiveCount(group) > 0">
+                {{ groupActiveCount(group) }} / {{ group.items.length }} {{ 'users.enabled' | translate }}
+              </span>
+            </div>
+          </div>
+        </summary>
+        @if (canManageModuleAccess()) {
+          <label class="group-toggle-wrap">
+            <input type="checkbox"
+              [checked]="isGroupAllChecked(group)"
+              [indeterminate]="isGroupIndeterminate(group)"
+              (change)="toggleGroup(group, $event)" />
+            <span>{{ 'users.selectAll' | translate }}</span>
+          </label>
+        }
+        <div class="permission-list">
+          @for (permission of group.items; track permission.code) {
+            <label class="permission-row checkbox-row" [class.disabled]="!canManageModuleAccess()" [for]="'permission-' + permission.code">
+              <div class="permission-info">
+                <span class="permission-desc">{{ permission.description }}</span>
+                <div class="permission-meta">
+                  <span class="permission-code">{{ permission.code }}</span>
+                  @if (isBranchScoped(permission.code)) {
+                    <span class="role-badge">{{ 'users.branchLimitedAccess' | translate }}</span>
+                  }
+                </div>
+              </div>
+              <input type="checkbox"
+                class="s2s-checkbox"
+                [id]="'permission-' + permission.code"
+                [checked]="isPermissionGranted(permission.code)"
+                [disabled]="!canManageModuleAccess()"
+                (change)="togglePermission(permission.code, $event)" />
+            </label>
+          }
+        </div>
+      </details>
+    }
+    @if (canManageModuleAccess()) {
+      <div class="s2s-actions">
+        <p-button [label]="'users.saveModuleAccess' | translate" icon="pi pi-check" [loading]="savingPermissions()"
+          [disabled]="!permissionsDirty()" (onClick)="savePermissions()" />
+      </div>
+    }
+  </section>
+
+  @if (canReadAudit()) {
+    <section class="s2s-panel">
+      <h2 class="section-title">{{ 'audit.history' | translate }}</h2>
+      <s2s-audit-trail entityType="USER" [entityId]="record()!.id" />
+    </section>
+  }
+}
+
+<s2s-reason-dialog
+  [visible]="statusDialogOpen()"
+  (visibleChange)="setStatusDialog($event)"
+  [headerKey]="'users.statusChange.' + (pendingStatus() ?? 'ACTIVE')"
+  [reasonRequired]="pendingStatus() === 'SUSPENDED'"
+  [saving]="saving()"
+  (confirmed)="confirmStatus($event)" />

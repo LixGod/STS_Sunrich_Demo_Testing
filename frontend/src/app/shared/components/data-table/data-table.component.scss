@@ -1,0 +1,105 @@
+:host {
+  display: block;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: var(--s2s-surface);
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+  box-shadow: var(--s2s-shadow);
+}
+
+.search {
+  flex: 1 1 16rem;
+  max-width: 24rem;
+
+  input {
+    width: 100%;
+  }
+}
+
+.toolbar-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.toolbar.stacked {
+  flex-direction: column;
+  align-items: stretch;
+
+  .search { flex: none; }
+  .toolbar-extra { width: 100%; margin-left: 0; }
+}
+
+.load-error {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--s2s-radius);
+  background: #fdecec;
+  color: #8a1c1c;
+}
+
+.sort-icon {
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--s2s-text-muted);
+}
+
+.actions-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.empty-cell {
+  text-align: center;
+}
+
+// Phones: one card per row with the column name beside each value, instead of a horizontally scrolling grid.
+@media (max-width: 767.98px) {
+  th {
+    display: none;
+  }
+
+  tr {
+    display: block;
+    border-bottom: 1px solid var(--s2s-border);
+    padding: 0.5rem 0;
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 0 !important;
+    padding: 0.25rem 0.5rem !important;
+    text-align: right;
+
+    &[data-label]::before {
+      content: attr(data-label);
+      font-weight: 600;
+      color: var(--s2s-text-muted);
+      text-align: left;
+    }
+  }
+
+  .actions-col {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .empty-cell {
+    justify-content: center;
+  }
+}

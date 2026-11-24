@@ -1,0 +1,148 @@
+<s2s-page-header [heading]="job()?.jobNumber ?? ''" [subtitle]="job()?.client?.name">
+  @if (job(); as current) {
+    <s2s-status-tag [status]="current.status" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert" [text]="key | translate" />
+}
+
+@if (job(); as current) {
+  @if (clock(); as c) {
+    @if (c.clock.startAt) {
+      <a class="clock" [class.over]="c.exceeded" [routerLink]="['/jobs', current.id, 'movements']">
+        <i class="pi pi-clock" aria-hidden="true"></i>
+        @if (c.exceeded) {
+          <span><strong>{{ c.clock.basisHours }} hours passed.</strong> Send the additional hours to the owners.</span>
+        } @else {
+          <span><strong>Charge clock {{ (c.clock.elapsedHours ?? 0) | number: '1.0-1' }} h</strong> of {{ c.clock.basisHours }} h
+            @if (c.clock.final) { · stopped } @else { · running since the tug left the jetty }</span>
+        }
+        <span class="go" aria-hidden="true">→</span>
+      </a>
+    }
+  }
+
+  <section class="s2s-panel flow" aria-labelledby="flow-title">
+    <header class="flow-head">
+      <h2 id="flow-title">STS flow</h2>
+      <span class="s2s-muted">{{ doneCount() }} of {{ steps().length }} done</span>
+    </header>
+    <div class="bar" role="progressbar" [attr.aria-valuenow]="doneCount()" aria-valuemin="0" [attr.aria-valuemax]="steps().length"
+      aria-labelledby="flow-title"><span [style.width.%]="doneCount() / steps().length * 100"></span></div>
+    <s2s-job-workflow [jobId]="current.id" (changed)="reload()" />
+    @if (activeRemaining(); as pending) {
+      <div class="flow-remaining" role="status">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span><strong>Left for {{ pending.title }}:</strong>
+          @for (item of pending.remaining.split(' · '); track item; let last = $last) {
+            @if (pending.route) {
+              <a [routerLink]="pending.route" [queryParams]="{ tab: remainingTab(item) }">{{ item }}</a>
+            } @else { {{ item }} }
+            @if (!last) { · }
+          }
+        </span>
+      </div>
+    }
+    <ol class="steps">
+      @for (step of steps(); track step.no) {
+        <li [class.done]="step.done" [class.now]="step.no === nextStep()">
+          <span class="mark" aria-hidden="true">@if (step.done) { <i class="pi pi-check"></i> } @else { {{ step.no }} }</span>
+          <div class="text">
+            <strong>{{ step.title }}</strong>
+            <span>{{ step.who }} · {{ step.detail }}</span>
+            @if (step.remaining && !step.done) {
+              <span class="left-text"><strong>Left:</strong>
+                @for (item of step.remaining.split(' · '); track item; let last = $last) {
+                  @if (remainingRoute(step, item); as route) {
+                    <a [routerLink]="route" [queryParams]="{ tab: remainingTab(item) }">{{ item }}</a>
+                  } @else { {{ item }} }
+                  @if (!last) { · }
+                }
+              </span>
+            }
+          </div>
+          <div class="go">
+            @for (link of step.extra ?? []; track link.label) { <a class="minor" [routerLink]="link.route">{{ link.label }}</a> }
+            @if (step.route) {
+              <a class="open" [routerLink]="step.route">
+                <span class="sr-only">{{ step.title }}: </span>{{ step.no === nextStep() ? 'Start' : 'Open' }}
+              </a>
+            }
+          </div>
+        </li>
+      }
+    </ol>
+  </section>
+
+  <div class="grid">
+    <section class="s2s-panel">
+      <h2>{{ 'job.vessels' | translate }}</h2>
+      <ul class="plain">
+        @for (vessel of current.vessels; track vessel.role) {
+          <li>
+            <strong>{{ (vessel.role === 'MOTHER' ? 'enquiry.mother' : 'enquiry.daughter') | translate }}:</strong>
+            {{ vessel.name }} · IMO {{ vessel.imo }}
+            @if (vessel.etaUtc) {
+              <br /><span class="s2s-muted">{{ 'enquiry.eta' | translate }}: {{ vessel.etaUtc | utcDateTime: vessel.etaTimezone }}</span>
+            }
+          </li>
+        }
+      </ul>
+      <h2>{{ 'job.cargo' | translate }}</h2>
+      <ul class="plain">
+        @for (line of current.cargo; track line.lineNo) {
+          <li>{{ line.cargoGradeName }}: {{ line.quantity }} {{ line.unitCode }}</li>
+        }
+      </ul>
+    </section>
+
+    <section class="s2s-panel">
+      <dl class="facts">
+        <div><dt>{{ 'job.operationType' | translate }}</dt><dd>{{ current.operationType ? ('enums.operationType.' + current.operationType | translate) : '—' }}</dd></div>
+        <div><dt>{{ 'job.quotedAmount' | translate }}</dt><dd class="amount">{{ current.quotedAmount | money: current.currency }}</dd></div>
+        @if (current.tariff; as tariff) {
+          <div><dt>{{ 'job.tariff' | translate }}</dt><dd>{{ tariff.tariffCode }}
+            @if ((tariff.billingIncrementMinutes ?? null) === null || (tariff.graceMinutes ?? null) === null || !tariff.roundingRule) {
+              <span class="s2s-muted"> · {{ 'job.pending' | translate }}</span>
+            }</dd></div>
+          <div><dt>{{ 'job.baseCharge' | translate: { hours: tariff.baseHours } }}</dt><dd class="amount">{{ tariff.baseCharge | money: tariff.currency }}</dd></div>
+          <div><dt>{{ 'job.extraHourRate' | translate }}</dt><dd class="amount">{{ tariff.extraHourRate | money: tariff.currency }}</dd></div>
+        }
+        @if (current.contact) {
+          <div><dt>{{ 'job.contact' | translate }}</dt><dd>{{ current.contact.name }}</dd></div>
+        }
+      </dl>
+      @if (current.tariff && canEditTariffTerms() && current.status !== 'CLOSED' && current.status !== 'CANCELLED') {
+        <button type="button" (click)="editTariffTerms()">{{ 'job.editTariffTerms' | translate }}</button>
+        @if (editingTariffTerms()) {
+          <form class="tariff-terms-form" (ngSubmit)="saveTariffTerms()">
+            <label>{{ 'job.increment' | translate }} (minutes)
+              <input type="number" name="increment" min="1" max="1440" required [(ngModel)]="tariffTerms.billingIncrementMinutes" />
+            </label>
+            <label>{{ 'job.grace' | translate }} (minutes)
+              <input type="number" name="grace" min="0" max="1440" required [(ngModel)]="tariffTerms.graceMinutes" />
+            </label>
+            <label>{{ 'job.rounding' | translate }}
+              <select name="rounding" required [(ngModel)]="tariffTerms.roundingRule">
+                <option value="">{{ 'common.select' | translate }}</option>
+                <option value="NONE">{{ 'enums.roundingRule.NONE' | translate }}</option>
+                <option value="ROUND_UP_TO_INCREMENT">{{ 'enums.roundingRule.ROUND_UP_TO_INCREMENT' | translate }}</option>
+              </select>
+            </label>
+            <label>{{ 'job.tariffTermsReason' | translate }}
+              <textarea name="reason" rows="2" maxlength="500" required [(ngModel)]="tariffTerms.reason"></textarea>
+            </label>
+            @if (tariffTermsError(); as error) { <p role="alert">{{ error }}</p> }
+            <div class="tariff-terms-actions">
+              <button type="submit" [disabled]="savingTariffTerms() || tariffTerms.billingIncrementMinutes === null || tariffTerms.graceMinutes === null || !tariffTerms.roundingRule || !tariffTerms.reason.trim()">{{ 'common.save' | translate }}</button>
+              <button type="button" (click)="editingTariffTerms.set(false)">{{ 'common.cancel' | translate }}</button>
+            </div>
+          </form>
+        }
+      }
+    </section>
+  </div>
+
+}

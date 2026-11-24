@@ -1,0 +1,17 @@
+<p-dialog
+  [header]="headerKey() | translate"
+  [(visible)]="visible"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: 'min(32rem, 95vw)' }">
+  @if (messageKey(); as message) {
+    <p>{{ message | translate }}</p>
+  }
+  <s2s-form-field labelKey="common.reason" fieldId="reason-input" [control]="reason" [required]="reasonRequired()">
+    <textarea pTextarea id="reason-input" rows="3" [formControl]="reason" maxlength="500"></textarea>
+  </s2s-form-field>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="visible.set(false)" />
+    <p-button [label]="confirmKey() | translate" [loading]="saving()" (onClick)="confirm()" />
+  </ng-template>
+</p-dialog>

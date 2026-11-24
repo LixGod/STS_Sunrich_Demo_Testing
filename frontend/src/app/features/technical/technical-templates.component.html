@@ -1,0 +1,87 @@
+<header><a routerLink="/administration/vessels">← Admin</a><h1>Document templates</h1>
+  <p>Configure owner-approved document requests and signed checklists. Drafts do not appear on jobs.</p></header>
+@if (error(); as message) { <p class="feedback error" role="alert">{{ message }}</p> }
+@if (notice(); as message) { <p class="feedback" role="status">{{ message }}</p> }
+
+<section class="s2s-panel">
+  <h2>Document request and email</h2>
+  <div class="toolbar"><label>Version
+    <select [ngModel]="currentRequest()?.id ?? ''" (ngModelChange)="selectRequestId($event)">
+      <option value="">New template</option>
+      @for (template of requests(); track template.id) {
+        <option [value]="template.id">v{{ template.versionNo }} · {{ template.name }} · {{ template.status }}</option>
+      }
+    </select></label><button type="button" (click)="newRequest()">New version</button></div>
+  <div class="fields">
+    <label>Name <input [ngModel]="requestDraft().name" (ngModelChange)="setRequestHeader('name', $event)" maxlength="150" /></label>
+    <label>Email subject <input [ngModel]="requestDraft().emailSubject" (ngModelChange)="setRequestHeader('emailSubject', $event)" maxlength="300" /></label>
+    <label>Email body <textarea rows="8" [ngModel]="requestDraft().emailBody" (ngModelChange)="setRequestHeader('emailBody', $event)"></textarea></label>
+  </div>
+  <p>Available placeholder names: JOB_NUMBER, MOTHER_VESSEL, DAUGHTER_VESSEL and REQUEST_ITEMS. Wrap a name in braces in the email template.</p>
+  <h3>Request items</h3>
+  @for (item of requestDraft().items; track $index; let i = $index) {
+    <div class="item">
+      <label>Code <input [ngModel]="item.code" (ngModelChange)="setRequestItem(i, 'code', $event)" maxlength="40" /></label>
+      <label>Label <input [ngModel]="item.label" (ngModelChange)="setRequestItem(i, 'label', $event)" maxlength="200" /></label>
+      <label>Kind <select [ngModel]="item.kind" (ngModelChange)="setRequestItem(i, 'kind', $event)">
+        <option value="DOCUMENT">Document</option><option value="DECLARATION">Declaration</option>
+        <option value="CONTACT">Contact</option><option value="VOYAGE_DATA">Voyage values</option>
+        <option value="CHECKLIST">Checklist</option></select></label>
+      <label>Applies to <select [ngModel]="item.appliesTo" (ngModelChange)="setRequestItem(i, 'appliesTo', $event)">
+        <option value="EACH_VESSEL">Each vessel</option><option value="JOB">Whole job</option></select></label>
+      @if (item.kind === 'DOCUMENT') {
+        <label>Document type <select [ngModel]="item.documentTypeId ?? ''" (ngModelChange)="setRequestItem(i, 'documentTypeId', $event || null)">
+          <option value="">Select</option>
+          @for (type of documentTypes(); track type.value) {
+            @if (type.meta?.['appliesTo'] === (item.appliesTo === 'JOB' ? 'JOB' : 'VESSEL')) {
+              <option [value]="type.value">{{ type.label }}</option>
+            }
+          }
+        </select></label>
+      }
+      <label class="checkbox"><input type="checkbox" [checked]="item.required" (change)="setRequestItem(i, 'required', $any($event.target).checked)" /> Required</label>
+      <button type="button" (click)="removeRequestItem(i)">Remove</button>
+    </div>
+  }
+  <div class="toolbar"><button type="button" (click)="addRequestItem()">Add item</button>
+    <button type="button" [disabled]="busy()" (click)="saveRequest()">Save draft</button></div>
+  @if (currentRequest()?.status === 'DRAFT') {
+    <div class="publish"><p>Publish only after Ship2Ship confirms the request count, wording and all five signed checklists.</p>
+      <label>Owner confirmation reference <input [ngModel]="ownerConfirmation()" (ngModelChange)="ownerConfirmation.set($event)" /></label>
+      <button type="button" [disabled]="busy() || !ownerConfirmation().trim()" (click)="publishRequest()">Publish request version</button></div>
+  }
+</section>
+
+<section class="s2s-panel">
+  <h2>Checklist templates</h2>
+  <div class="toolbar"><label>Version
+    <select [ngModel]="currentChecklist()?.id ?? ''" (ngModelChange)="selectChecklistId($event)">
+      <option value="">New checklist</option>
+      @for (template of checklists(); track template.id) {
+        <option [value]="template.id">{{ template.code }} v{{ template.versionNo }} · {{ template.status }}</option>
+      }
+    </select></label><button type="button" (click)="newChecklist()">New version</button></div>
+  <div class="fields">
+    <label>Code <input [ngModel]="checklistDraft().code" (ngModelChange)="setChecklistHeader('code', $event)" maxlength="40" /></label>
+    <label>Name <input [ngModel]="checklistDraft().name" (ngModelChange)="setChecklistHeader('name', $event)" maxlength="200" /></label>
+    <label>Applies to <select [ngModel]="checklistDraft().appliesTo" (ngModelChange)="setChecklistHeader('appliesTo', $event)">
+      <option value="EACH_VESSEL">Each vessel</option><option value="JOB">Whole job</option></select></label>
+  </div>
+  <h3>Owner-approved questions</h3>
+  @for (item of checklistDraft().items; track $index; let i = $index) {
+    <div class="item">
+      <label>Code <input [ngModel]="item.code" (ngModelChange)="setChecklistItem(i, 'code', $event)" maxlength="40" /></label>
+      <label>Question <input [ngModel]="item.label" (ngModelChange)="setChecklistItem(i, 'label', $event)" maxlength="300" /></label>
+      <label>Answer <select [ngModel]="item.answerType" (ngModelChange)="setChecklistItem(i, 'answerType', $event)">
+        <option value="YES_NO">Yes / No</option><option value="TEXT">Text</option>
+        <option value="NUMBER">Number</option><option value="DATE">Date</option></select></label>
+      <label class="checkbox"><input type="checkbox" [checked]="item.required" (change)="setChecklistItem(i, 'required', $any($event.target).checked)" /> Required</label>
+      <button type="button" (click)="removeChecklistItem(i)">Remove</button>
+    </div>
+  }
+  <div class="toolbar"><button type="button" (click)="addChecklistItem()">Add question</button>
+    <button type="button" [disabled]="busy()" (click)="saveChecklist()">Save draft</button>
+    @if (currentChecklist()?.status === 'DRAFT') {
+      <button type="button" [disabled]="busy() || !checklistDraft().items.length" (click)="publishChecklist()">Publish checklist</button>
+    }</div>
+</section>

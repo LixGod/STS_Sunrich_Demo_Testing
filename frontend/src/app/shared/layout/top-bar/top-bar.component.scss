@@ -1,0 +1,104 @@
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  height: var(--s2s-topbar-height);
+  padding: 0 1.15rem;
+  background: rgb(255 254 253 / 94%);
+  border-bottom: 1px solid var(--s2s-border);
+  box-shadow: 0 4px 24px rgb(36 29 37 / 5%);
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+  color: var(--s2s-text);
+  font-weight: 700;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+}
+
+.brand-logo {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  flex: 0 0 3.6rem;
+  width: 3.6rem;
+  height: 2.6rem;
+
+  img {
+    position: absolute;
+    width: 4.6rem;
+    height: 4.6rem;
+    max-width: none;
+    left: -0.5rem;
+    top: -1.1rem;
+  }
+}
+
+.spacer {
+  flex: 1;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--s2s-text-muted);
+  max-width: 15rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.35rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: 999px;
+  background: #faf7f5;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover { background: #f1e9e7; }
+}
+
+.user-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: var(--p-primary-50, #fbf1f2);
+  color: var(--s2s-brand);
+  border: 1px solid var(--p-primary-100, #f6dfe1);
+  font-size: 0.85rem;
+}
+
+.user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--s2s-text);
+}
+
+@media (min-width: 992px) {
+  .menu-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .user-name,
+  .brand-name {
+    display: none;
+  }
+
+  // Keep the sign-out button icon-only on small phones.
+  .sign-out ::ng-deep .p-button-label {
+    display: none;
+  }
+
+  .topbar { padding: 0 0.6rem; gap: 0.35rem; }
+}

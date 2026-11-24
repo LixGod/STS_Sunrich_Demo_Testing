@@ -1,0 +1,238 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.upload {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 0.75rem;
+  align-items: end;
+
+  @media (min-width: 992px) {
+    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 1fr) minmax(14rem, 1.5fr) auto;
+  }
+}
+
+.upload-action {
+  padding-bottom: 1.4rem;
+}
+
+.file {
+  width: 100%;
+  padding: 0.45rem 0;
+}
+
+.progress {
+  margin: 0.5rem 0;
+}
+
+.documents {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  li.old .doc {
+    opacity: 0.7;
+  }
+
+  li.current .doc {
+    border-color: var(--p-primary-color);
+    box-shadow: inset 3px 0 0 var(--p-primary-color);
+  }
+}
+
+.doc {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--p-primary-color);
+  }
+}
+
+.doc-main {
+  flex: 1 1 14rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  span {
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+.doc-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+p-message {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+// Form beside the source document on wide screens; stacked (document first) on phones and tablets.
+.workspace {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1rem;
+
+  @media (min-width: 1200px) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.source-pane {
+  @media (min-width: 1200px) {
+    position: sticky;
+    top: 1rem;
+    height: calc(100vh - 8rem);
+
+    s2s-document-viewer {
+      height: 100%;
+    }
+  }
+}
+
+fieldset {
+  border: 0;
+  margin: 0 0 1rem;
+  padding: 0;
+
+  legend {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--s2s-text-muted);
+    margin-bottom: 0.5rem;
+  }
+}
+
+.value-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.75rem;
+  padding: 0.5rem 0.75rem 0;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+
+  .value {
+    grid-column: 1 / -1;
+  }
+
+  &.warned {
+    border-color: var(--p-orange-400, #fb923c);
+  }
+
+  @media (min-width: 768px) {
+    // minmax(0, …) lets the inputs shrink instead of pushing the row under the document viewer.
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 5rem auto;
+    align-items: start;
+
+    .value {
+      grid-column: auto;
+    }
+  }
+}
+
+.with-unit {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.unit {
+  color: var(--s2s-text-muted);
+  font-size: 0.875rem;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 1.6rem;
+  grid-column: 1 / -1;
+
+  @media (min-width: 768px) {
+    grid-column: auto;
+  }
+}
+
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+
+:host ::ng-deep .p-select,
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-inputnumber-input,
+:host ::ng-deep .p-inputtext {
+  width: 100%;
+}

@@ -1,0 +1,196 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+
+  s2s-form-field {
+    flex: 1 1 18rem;
+    max-width: 28rem;
+  }
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.extra-hours-toggle {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+
+  input[type='checkbox'] {
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--p-primary-color);
+      outline-offset: 2px;
+    }
+  }
+
+  label {
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+}
+
+// One card per line on phones; a single row on wide screens.
+.line {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--s2s-border);
+  border-left: 4px solid var(--s2s-border);
+  border-radius: var(--s2s-radius);
+
+  &.revenue {
+    border-left-color: var(--p-primary-color);
+  }
+
+  .equipment {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 1200px) {
+    grid-template-columns: minmax(10rem, 1.5fr) 8rem minmax(10rem, 1.2fr) 7rem 9rem 9rem auto;
+    align-items: start;
+
+    .equipment {
+      grid-column: auto;
+    }
+
+    &.revenue { grid-template-columns: 8rem minmax(10rem, 1fr) 7rem 9rem 9rem auto; }
+    &.revenue.additional-tariff {
+      grid-template-columns: 8rem minmax(12rem, 1fr) auto 9rem 9rem auto;
+
+      .extra-hours-toggle {
+        grid-column: auto;
+        align-self: center;
+        padding-top: 1.35rem;
+      }
+    }
+    &.revenue.additional-tariff.extra-hours {
+      grid-template-columns: 8rem minmax(12rem, 1fr) auto 7rem 9rem 9rem auto;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    &.equipment-selected { grid-template-columns: minmax(12rem, 1.5fr) minmax(10rem, 1.2fr) 7rem 9rem 9rem auto; }
+    &.equipment-selected.equipment-head-set { grid-template-columns: minmax(12rem, 1.5fr) 7rem 9rem 9rem auto; }
+  }
+}
+
+.amount {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.1rem;
+
+  .label {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  output {
+    padding: 0.55rem 0;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+}
+
+.remove {
+  align-self: center;
+  justify-self: end;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.25rem 1.5rem;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--s2s-radius);
+  background: var(--p-content-hover-background, rgba(0, 0, 0, 0.03));
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  dt {
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .negative dd {
+    color: var(--p-red-600, #b91c1c);
+  }
+}
+
+.hint {
+  font-size: 0.8125rem;
+  margin: 0.5rem 0 0;
+}
+
+:host ::ng-deep .p-select,
+:host ::ng-deep .p-inputnumber,
+:host ::ng-deep .p-inputnumber-input,
+:host ::ng-deep .p-inputtext {
+  width: 100%;
+}

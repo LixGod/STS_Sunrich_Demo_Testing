@@ -1,0 +1,13 @@
+<!-- Loaded once the browser is idle, keeping the toast component out of the start-up bundle. -->
+@defer (on idle) {
+  <p-toast position="top-right" />
+}
+@if (!online()) {
+  <div class="pwa-status" role="status">{{ 'pwa.offline' | translate }}</div>
+}
+@if (updateReady()) {
+  <div class="pwa-status" role="status">{{ 'pwa.updateReady' | translate }}
+    <button type="button" class="pwa-refresh" (click)="refresh()">{{ 'pwa.refresh' | translate }}</button>
+  </div>
+}
+<router-outlet />

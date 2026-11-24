@@ -1,0 +1,392 @@
+@if (!embedded()) {
+<s2s-page-header
+  [heading]="embedded() ? ('quotation.title' | translate) : (overview()?.enquiryReference ?? ('quotation.title' | translate))"
+  [subtitle]="overview()?.reference ? overview()!.reference + ' · ' + (enquiry()?.client?.name ?? '') : enquiry()?.client?.name">
+  @if (overview(); as current) {
+    <s2s-status-tag [status]="current.enquiryStatus" />
+    @if (current.job; as job) {
+      <p-button [label]="'quotation.openJob' | translate: { number: job.jobNumber }" icon="pi pi-briefcase" [routerLink]="['/jobs', job.id]" />
+    }
+    @if (current.canCreateVersion && matchingVersions().length) {
+      <p-button [label]="'quotation.newVersion' | translate" icon="pi pi-plus" [outlined]="true" [loading]="tariffsLoading()" (onClick)="openTerms(true)" />
+    }
+  }
+</s2s-page-header>
+}
+
+@if (!embedded()) { <s2s-enquiry-tabs [enquiryId]="id()" /> }
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+
+@if (overview(); as current) {
+  @if (matchingVersions().length === 0) {
+    <section class="s2s-panel empty">
+      <s2s-empty-state [messageKey]="embedded() ? 'quotation.emptyForEstimate' : 'quotation.empty'" icon="pi pi-file" />
+      @if (current.canCreateVersion) {
+        <p-button [label]="'quotation.prepare' | translate" icon="pi pi-plus" [loading]="tariffsLoading()" (onClick)="openTerms(true)" />
+      }
+    </section>
+  } @else {
+    <div class="layout" [class.embedded]="embedded()">
+      @if (!embedded()) {
+      <nav class="s2s-panel versions" [attr.aria-label]="'quotation.versions' | translate">
+        <h2>{{ 'quotation.versions' | translate }}</h2>
+        <ul>
+          @for (version of matchingVersions(); track version.id) {
+            <li>
+              <button type="button" [class.active]="version.id === selected()?.id" [attr.aria-current]="version.id === selected()?.id ? 'true' : null"
+                (click)="select(version)">
+                <span>{{ 'quotation.versionLabel' | translate: { no: version.versionNo } }}</span>
+                <s2s-status-tag [status]="version.status" />
+                <span class="s2s-muted amount">{{ version.totalAmount | money: version.currency }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      </nav>
+      }
+
+      @if (selected(); as version) {
+        <article class="s2s-panel detail" [attr.aria-busy]="loading() || saving()">
+          @if (!embedded()) {
+          <header class="detail-head">
+            <div>
+              <h2>{{ 'quotation.versionLabel' | translate: { no: version.versionNo } }}</h2>
+              @if (version.estimateVersionNo) {
+                <p class="s2s-muted">{{ 'quotation.basedOn' | translate: { no: version.estimateVersionNo } }}</p>
+              }
+            </div>
+            <s2s-status-tag [status]="version.status" />
+          </header>
+          }
+
+          @if (embedded()) {
+            <div class="pdf-preview" [attr.aria-label]="'quotation.previewTitle' | translate">
+              @if (previewError()) {
+                <p class="s2s-muted">{{ 'quotation.previewFailed' | translate }}</p>
+              } @else if (previewPages().length) {
+                @for (page of previewPages(); track page) {
+                  <img [src]="previewPageUrl(version, page)" [alt]="'quotation.previewPage' | translate: { page: page }" loading="lazy"
+                    (error)="previewError.set(true)" />
+                }
+              } @else {
+                <p class="s2s-muted">{{ 'common.loading' | translate }}</p>
+              }
+            </div>
+          }
+
+          <div class="actions">
+            @if (embedded() && current.canCreateVersion) {
+              <p-button [label]="'quotation.newVersion' | translate" icon="pi pi-plus" [outlined]="true" [loading]="tariffsLoading()" (onClick)="openTerms(true)" />
+            }
+            <a class="p-button p-button-outlined pdf" [href]="pdfUrl(version)" target="_blank" rel="noopener">
+              <i class="pi pi-file-pdf" aria-hidden="true"></i>
+              {{ 'quotation.pdf' | translate }}
+            </a>
+            @if (can().has('EDIT')) {
+              <p-button [label]="'quotation.edit' | translate" icon="pi pi-pencil" [outlined]="true" [loading]="tariffsLoading()" (onClick)="openTerms(false)" />
+            }
+            @if (can().has('ISSUE')) {
+              <p-button [label]="'quotation.issue' | translate" icon="pi pi-envelope" (onClick)="openIssue()" />
+            }
+            @if (can().has('ACCEPT')) {
+              <p-button [label]="'quotation.accept' | translate" icon="pi pi-verified" (onClick)="openAccept()" />
+            }
+            @if (can().has('OWNER_REJECT')) {
+              <p-button [label]="'quotation.ownerReject' | translate" icon="pi pi-times" severity="danger" [outlined]="true"
+                (onClick)="dialog.set('ownerReject')" />
+            }
+          </div>
+
+          @if (version.status === 'ACCEPTED') {
+            <section class="advance-panel" [attr.aria-label]="'quotation.advanceTracking' | translate">
+              <div class="advance-head">
+                <h3>{{ 'quotation.advanceTracking' | translate }}</h3>
+                <s2s-status-tag [status]="version.advanceStatus" />
+              </div>
+              <dl class="advance-summary" aria-live="polite">
+                <div>
+                  <dt>{{ 'quotation.finalAmount' | translate }}</dt>
+                  <dd><output>{{ version.finalAmount | money: version.currency }}</output></dd>
+                </div>
+                <div>
+                  <dt>{{ 'quotation.advancePaidTotal' | translate }}</dt>
+                  <dd><output>{{ version.advancePaid | money: version.currency }}</output></dd>
+                </div>
+                <div class="remaining" [class.paid]="version.advanceRemaining === 0">
+                  <dt>{{ 'quotation.advanceRemaining' | translate }}</dt>
+                  <dd><output>{{ version.advanceRemaining | money: version.currency }}</output></dd>
+                </div>
+              </dl>
+
+              @if (can().has('RECORD_ADVANCE')) {
+                <form [formGroup]="advanceForm" (ngSubmit)="recordAdvance()" novalidate class="advance-form">
+                  <s2s-form-field labelKey="quotation.advanceAmount" fieldId="q-advance-amount" [control]="advanceForm.controls.amount" [required]="true">
+                    <p-inputnumber inputId="q-advance-amount" formControlName="amount" mode="decimal" [minFractionDigits]="2" [maxFractionDigits]="2"
+                      [min]="0.01" [max]="version.advanceRemaining" />
+                  </s2s-form-field>
+                  <s2s-form-field labelKey="quotation.advanceNote" fieldId="q-advance-note" [control]="advanceForm.controls.note">
+                    <input pInputText id="q-advance-note" name="advanceNote" formControlName="note" maxlength="500" />
+                  </s2s-form-field>
+                  <div class="advance-actions">
+                    <p-button type="button" [label]="'quotation.fillRemaining' | translate" [text]="true" size="small" (onClick)="fillRemainingAdvance()" />
+                    <p-button type="submit" [label]="'quotation.recordAdvance' | translate" icon="pi pi-check" [loading]="saving()" />
+                  </div>
+                </form>
+              } @else if (version.advanceStatus === 'PAID') {
+                <p class="s2s-muted advance-note">{{ 'quotation.advancePaidFull' | translate }}</p>
+              }
+
+              @if (version.advancePayments.length) {
+                <div class="advance-history">
+                  <h4>{{ 'quotation.advanceHistory' | translate }}</h4>
+                  <ul>
+                    @for (payment of version.advancePayments; track payment.id; let idx = $index) {
+                      <li>
+                        <strong>{{ payment.amount | money: version.currency }}</strong>
+                        <span class="s2s-muted">
+                          {{ 'quotation.advanceEntry' | translate: { no: idx + 1, name: payment.recordedByName ?? '—', at: (payment.recordedAt | utcDateTime) } }}
+                          @if (payment.note) { — {{ payment.note }} }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </section>
+          }
+
+          @if (!embedded()) {
+          <dl class="facts">
+            <div><dt>{{ 'quotation.total' | translate }}</dt><dd class="total">{{ version.totalAmount | money: version.currency }}</dd></div>
+            <div><dt>GST (18%)</dt><dd>{{ gst(version.totalAmount) | money: version.currency }}</dd></div>
+            <div><dt>Total including GST</dt><dd class="total">{{ version.totalAmount + gst(version.totalAmount) | money: version.currency }}</dd></div>
+            <div><dt>{{ 'quotation.validUntil' | translate }}</dt><dd>{{ version.validUntil }}</dd></div>
+            <div class="wide">
+              <dt>{{ 'quotation.tariff' | translate }}</dt>
+              <dd>
+                @if (version.tariff; as tariff) {
+                  <strong>{{ tariff.code }} — {{ tariff.name }}</strong><br />
+                  {{ 'quotation.tariffTerms' | translate: { hours: tariff.baseHours, currency: tariff.currency,
+                    base: (tariff.baseCharge | money), extra: (tariff.extraHourRate | money) } }}
+                  @if (tariff.termsPending) {
+                    <br /><span class="s2s-muted">{{ 'quotation.termsPending' | translate }}</span>
+                  }
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
+            @if (version.paymentTerms) {
+              <div class="wide"><dt>{{ 'quotation.paymentTerms' | translate }}</dt><dd class="pre">{{ version.paymentTerms }}</dd></div>
+            }
+            @if (version.advanceReceived != null) {
+              <div><dt>{{ 'quotation.advanceReceived' | translate }}</dt><dd>{{ version.currency }} {{ version.advanceReceived | money }}</dd></div>
+            }
+            @if (version.advanceGiven != null) {
+              <div><dt>{{ 'quotation.advanceGiven' | translate }}</dt><dd>{{ version.currency }} {{ version.advanceGiven | money }}</dd></div>
+            }
+            @if (version.termsText) {
+              <div class="wide"><dt>{{ 'quotation.termsText' | translate }}</dt><dd class="pre">{{ version.termsText }}</dd></div>
+            }
+            @if (version.scopeOfServices) {
+              <div class="wide"><dt>{{ 'quotation.scopeOfServices' | translate }}</dt><dd class="pre">{{ version.scopeOfServices }}</dd></div>
+            }
+          </dl>
+
+          <h3>{{ 'quotation.lines' | translate }}</h3>
+          <div class="table-wrap">
+            <table class="lines">
+              <thead>
+                <tr>
+                  <th scope="col">{{ 'estimate.description' | translate }}</th>
+                  <th scope="col" class="num">{{ 'estimate.quantity' | translate }}</th>
+                  <th scope="col" class="num">{{ 'estimate.unitPrice' | translate }}</th>
+                  <th scope="col" class="num">{{ 'estimate.amount' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of version.lines; track line.lineNo) {
+                  <tr>
+                    <td>{{ line.costHeadName }}@if (line.description) { — {{ line.description }} }</td>
+                    <td class="num">{{ line.quantity }}</td>
+                    <td class="num">{{ line.unitPrice | money }}</td>
+                    <td class="num">{{ line.amount | money }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr><td colspan="3">{{ 'quotation.total' | translate }}</td><td class="num">{{ version.totalAmount | money: version.currency }}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+          }
+
+          <ul class="trail">
+            @if (version.submittedAt) {
+              <li>{{ 'quotation.submitted' | translate: { name: version.submittedByName, at: (version.submittedAt | utcDateTime) } }}</li>
+            }
+            @if (version.decidedAt) {
+              <li>
+                {{ 'quotation.decided' | translate: { name: version.decidedByName, at: (version.decidedAt | utcDateTime) } }}
+                @if (version.decisionReason) { — <em>{{ version.decisionReason }}</em> }
+              </li>
+            }
+            @if (version.issuedAt) {
+              <li>{{ 'quotation.issued' | translate: { name: version.issuedByName, at: (version.issuedAt | utcDateTime), to: version.issuedTo,
+                channel: ('quotation.channel' + version.issueChannel | translate) } }}</li>
+            }
+            @if (version.acceptance; as acceptance) {
+              <li>
+                {{ 'quotation.accepted' | translate: { name: acceptance.acceptedByName, at: (acceptance.acceptedAt | utcDateTime) } }}
+                @if (acceptance.jobNumber) { · {{ acceptance.jobNumber }} }
+                @if (acceptance.afterValidity) { <span class="warn">{{ 'quotation.afterValidity' | translate }}</span> }
+              </li>
+            }
+          </ul>
+          @if (version.pdfSha256) {
+            <p class="hash s2s-muted"><span>{{ 'quotation.pdfHash' | translate }}:</span> <code>{{ version.pdfSha256 }}</code></p>
+          }
+        </article>
+      }
+    </div>
+  }
+}
+
+<!-- Terms (new version or edit draft) -->
+<p-dialog [header]="(creating() ? 'quotation.prepare' : 'quotation.termsTitle') | translate" [visible]="dialog() === 'terms'"
+  (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false" [style]="{ width: 'min(40rem, 96vw)' }">
+  @if (dialog() === 'terms') {
+    @if (dialogError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+    <form [formGroup]="termsForm" (ngSubmit)="saveTerms()" novalidate class="dialog-form">
+      @if (creating()) {
+        <s2s-form-field labelKey="quotation.estimate" fieldId="q-estimate" [control]="termsForm.controls.estimateId" [required]="true">
+          <p-select inputId="q-estimate" formControlName="estimateId" [options]="estimateOptions()" optionLabel="label" optionValue="value" appendTo="body" (onChange)="syncTariff()" />
+        </s2s-form-field>
+      }
+      <s2s-form-field labelKey="quotation.validityDays" fieldId="q-valid" [control]="termsForm.controls.validityDays" [required]="true">
+        <p-inputnumber inputId="q-valid" formControlName="validityDays" [min]="1" [max]="60" [useGrouping]="false" />
+      </s2s-form-field>
+      <div class="validity-presets">
+        <p-button type="button" [label]="'quotation.days5' | translate" [text]="true" size="small" (onClick)="termsForm.controls.validityDays.setValue(5)" />
+        <p-button type="button" [label]="'quotation.days10' | translate" [text]="true" size="small" (onClick)="termsForm.controls.validityDays.setValue(10)" />
+      </div>
+      <s2s-form-field labelKey="quotation.tariff" fieldId="q-tariff" [control]="termsForm.controls.tariffId" hintKey="quotation.tariffHint">
+        <p-select inputId="q-tariff" formControlName="tariffId" [options]="tariffOptions()" optionLabel="label" optionValue="value"
+          [showClear]="true" appendTo="body" [placeholder]="'common.select' | translate" />
+      </s2s-form-field>
+      @if (termsCurrency() === 'USD') {
+        <s2s-form-field labelKey="quotation.inrRateLabel" fieldId="q-inr-rate" [control]="termsForm.controls.inrFxRate" hintKey="quotation.inrRateHint">
+          <p-inputnumber inputId="q-inr-rate" name="inrFxRate" formControlName="inrFxRate" mode="decimal" inputmode="decimal"
+            [minFractionDigits]="2" [maxFractionDigits]="8" [min]="0.0001" />
+        </s2s-form-field>
+      }
+      <s2s-form-field labelKey="quotation.advanceReceived" fieldId="q-advance-received" [control]="termsForm.controls.advanceReceived">
+        <p-inputnumber inputId="q-advance-received" formControlName="advanceReceived" [min]="0" [maxFractionDigits]="4" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="quotation.advanceGiven" fieldId="q-advance-given" [control]="termsForm.controls.advanceGiven">
+        <p-inputnumber inputId="q-advance-given" formControlName="advanceGiven" [min]="0" [maxFractionDigits]="4" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="quotation.scopeOfServices" fieldId="q-scope" [control]="termsForm.controls.scopeOfServices" hintKey="quotation.scopeHint">
+        <textarea pTextarea id="q-scope" formControlName="scopeOfServices" rows="8" maxlength="8000"></textarea>
+      </s2s-form-field>
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="quotation.paymentTerms" fieldId="q-payment" [control]="termsForm.controls.paymentTerms">
+          <input pInputText id="q-payment" formControlName="paymentTerms" maxlength="500" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="quotation.termsText" fieldId="q-terms" [control]="termsForm.controls.termsText">
+          <textarea pTextarea id="q-terms" formControlName="termsText" rows="5" maxlength="8000"></textarea>
+        </s2s-form-field>
+      </details>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveTerms()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Issue -->
+<p-dialog [header]="'quotation.issueTitle' | translate" [visible]="dialog() === 'issue'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(36rem, 96vw)' }">
+  @if (dialog() === 'issue') {
+    <p class="s2s-muted">{{ 'quotation.issueHint' | translate }}</p>
+    @if (dialogError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+    <form [formGroup]="issueForm" (ngSubmit)="saveIssue()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="quotation.issuedTo" fieldId="i-to" [control]="issueForm.controls.issuedTo" [required]="true" hintKey="quotation.issuedToHint">
+        <input pInputText id="i-to" formControlName="issuedTo" maxlength="300" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="quotation.channel" fieldId="i-channel" [control]="issueForm.controls.channel">
+        <p-select inputId="i-channel" formControlName="channel" [options]="channelOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="quotation.note" fieldId="i-note" [control]="issueForm.controls.note">
+          <input pInputText id="i-note" formControlName="note" maxlength="500" />
+        </s2s-form-field>
+      </details>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'quotation.issue' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveIssue()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Owner acceptance -->
+<p-dialog [header]="'quotation.acceptTitle' | translate" [visible]="dialog() === 'accept'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(40rem, 96vw)' }">
+  @if (dialog() === 'accept') {
+    <p-message severity="warn" [text]="'quotation.acceptHint' | translate" />
+    @if (dialogError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+    <form [formGroup]="acceptForm" (ngSubmit)="saveAccept()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="quotation.acceptedByName" fieldId="a-by" [control]="acceptForm.controls.acceptedByName" [required]="true"
+        hintKey="quotation.acceptedByHint">
+        <input pInputText id="a-by" formControlName="acceptedByName" maxlength="150" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="quotation.acceptedAt" fieldId="a-at" [control]="acceptForm.controls.acceptedAt" [required]="true">
+        <s2s-date-time-picker inputId="a-at" formControlName="acceptedAt" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="job.number" fieldId="a-job" [control]="acceptForm.controls.jobNumber" hintKey="quotation.jobNumberHint">
+        <input pInputText id="a-job" formControlName="jobNumber" maxlength="40" />
+      </s2s-form-field>
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="quotation.paymentTerms" fieldId="a-pay" [control]="acceptForm.controls.paymentTerms">
+          <input pInputText id="a-pay" formControlName="paymentTerms" maxlength="500" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="quotation.specialConditions" fieldId="a-cond" [control]="acceptForm.controls.specialConditions">
+          <textarea pTextarea id="a-cond" formControlName="specialConditions" rows="3" maxlength="4000"></textarea>
+        </s2s-form-field>
+      </details>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'quotation.accept' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveAccept()" />
+  </ng-template>
+</p-dialog>
+
+<p-dialog [header]="'quotation.ownerReject' | translate" [visible]="dialog() === 'ownerReject'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(32rem, 95vw)' }">
+  <p>{{ 'quotation.ownerRejectHint' | translate }}</p>
+  @if (dialogError(); as key) { <p-message severity="error" role="alert" [text]="key | translate" /> }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'quotation.ownerReject' | translate" severity="danger" [loading]="saving()" (onClick)="rejectByOwner()" />
+  </ng-template>
+</p-dialog>

@@ -1,0 +1,154 @@
+@if (invoice(); as i) {
+  <s2s-page-header [heading]="i.number ?? ('finance.draftNumber' | translate)"
+    [subtitle]="((i.docType === 'CREDIT_NOTE' ? 'finance.creditTitle' : 'finance.invoiceTitle') | translate) + ' · ' + i.jobNumber + ' · ' + (i.clientName ?? '')">
+    <p-button [label]="'finance.backToJob' | translate" icon="pi pi-arrow-left" [text]="true" [routerLink]="['/jobs', i.jobId, 'finance']" [queryParams]="{ tab: 'invoices' }" />
+  </s2s-page-header>
+}
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') { <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" /> }
+  </p-message>
+}
+
+@if (invoice(); as i) {
+  <section class="s2s-panel">
+    <header class="head">
+      <div class="title">
+        <s2s-status-tag [status]="i.status" />
+        @if (i.creditedInvoiceNumber) {
+          <a [routerLink]="['/finance/invoices', i.creditedInvoiceId]">{{ 'finance.credits' | translate: { number: i.creditedInvoiceNumber } }}</a>
+        }
+      </div>
+      <a class="p-button p-button-outlined link-button" [href]="pdfUrl(i)" target="_blank" rel="noopener">
+        <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ (i.pdfSha256 ? 'finance.issuedPdf' : 'finance.draftPdf') | translate }}</a>
+    </header>
+    <div class="actions">
+      @if (editable()) { <p-button [label]="'common.save' | translate" icon="pi pi-check" [disabled]="!dirty()" [loading]="saving()" (onClick)="save()" /> }
+      @if (can().has('SUBMIT')) {
+        <p-button [label]="'finance.submit' | translate" icon="pi pi-send" [disabled]="dirty() || i.blockers.length > 0" [loading]="saving()" (onClick)="act('submit')" />
+      }
+      @if (can().has('APPROVE')) { <p-button [label]="'finance.approve' | translate" icon="pi pi-check-circle" (onClick)="dialog.set('approve')" /> }
+      @if (can().has('RETURN')) { <p-button [label]="'finance.return' | translate" icon="pi pi-undo" severity="danger" [outlined]="true" (onClick)="dialog.set('return')" /> }
+      @if (can().has('ISSUE')) { <p-button [label]="'finance.issue' | translate" icon="pi pi-verified" (onClick)="dialog.set('issue')" /> }
+      @if (can().has('CREDIT')) { <p-button [label]="'finance.creditNote' | translate" icon="pi pi-replay" [outlined]="true" [loading]="saving()" (onClick)="creditNote()" /> }
+      @if (canRecordReceipt()) {
+        <p-button [label]="'finance.recordReceipt' | translate" icon="pi pi-money-bill" [outlined]="true" [routerLink]="['/finance/receipts']" [queryParams]="{ invoice: i.id }" />
+      }
+    </div>
+    @if (editable() && dirty()) { <p class="s2s-muted small">{{ 'finance.saveFirst' | translate }}</p> }
+    @if (i.returnedReason && i.status === 'DRAFT') { <p-message severity="warn" [text]="'finance.returned' | translate: { reason: i.returnedReason }" /> }
+    @if (i.blockers.length && !dirty()) {
+      <div class="notice blockers" role="status"><strong>{{ 'finance.blockersTitle' | translate }}</strong>
+        <ul>@for (b of i.blockers; track b.code) { <li>{{ b.message }}</li> }</ul></div>
+    }
+    <ul class="trail">
+      @if (i.submittedAt) { <li>{{ 'finance.submittedBy' | translate: { name: i.submittedByName, at: (i.submittedAt | utcDateTime) } }}</li> }
+      @if (i.decidedAt) { <li>{{ 'finance.approvedBy' | translate: { name: i.decidedByName, at: (i.decidedAt | utcDateTime) } }}</li> }
+      @if (i.issuedAt) { <li>{{ 'finance.issuedBy' | translate: { name: i.issuedByName, at: (i.issuedAt | utcDateTime) } }}</li> }
+    </ul>
+    @if (i.pdfSha256) { <p class="hash s2s-muted">SHA-256: <code>{{ i.pdfSha256 }}</code></p> }
+
+    <dl class="amounts" [attr.aria-label]="'finance.gross' | translate">
+      <div><dt>{{ 'finance.net' | translate }}</dt><dd>{{ i.currency }} {{ money(editable() ? totals().net : i.netAmount) }}</dd></div>
+      @if (!editable() && hasTax()) {
+        <div><dt>{{ 'finance.tax' | translate }}</dt><dd>{{ i.currency }} {{ money(i.taxAmount) }}</dd></div>
+      }
+      <div class="gross"><dt>{{ 'finance.gross' | translate }}</dt><dd data-testid="invoice-gross">{{ i.currency }} {{ money(editable() ? totals().gross : i.grossAmount) }}</dd></div>
+      @if (i.docType === 'INVOICE' && i.status === 'ISSUED') {
+        <div><dt>{{ 'finance.credited' | translate }}</dt><dd>{{ money(i.creditedAmount) }}</dd></div>
+        <div><dt>{{ 'finance.received' | translate }}</dt><dd>{{ money(i.receivedAmount) }}</dd></div>
+        <div class="gross"><dt>{{ 'finance.open' | translate }}</dt><dd data-testid="invoice-open">{{ i.currency }} {{ money(i.outstandingAmount) }}</dd></div>
+      }
+    </dl>
+    @if (editable()) { <p class="s2s-muted small">{{ 'finance.liveTotals' | translate }}</p> }
+  </section>
+
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate class="entries">
+    <section class="s2s-panel">
+      <h2>{{ 'finance.header' | translate }}</h2>
+      <div class="grid">
+        <s2s-form-field labelKey="finance.invoiceDate" fieldId="inv-date" [control]="form.controls.invoiceDate" [required]="true">
+          <input pInputText id="inv-date" type="date" formControlName="invoiceDate" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="finance.dueDate" fieldId="inv-due" [control]="form.controls.dueDate" [required]="i.docType === 'INVOICE'" hintKey="finance.dueDateHint">
+          <input pInputText id="inv-due" type="date" formControlName="dueDate" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="finance.billingName" fieldId="inv-name" [control]="form.controls.billingName" [required]="true">
+          <input pInputText id="inv-name" formControlName="billingName" maxlength="200" />
+        </s2s-form-field>
+        <s2s-form-field labelKey="finance.paymentTerms" fieldId="inv-terms" [control]="form.controls.paymentTerms">
+          <input pInputText id="inv-terms" formControlName="paymentTerms" maxlength="500" />
+        </s2s-form-field>
+      </div>
+      <s2s-form-field labelKey="finance.billingAddress" fieldId="inv-address" [control]="form.controls.billingAddress">
+        <textarea pTextarea id="inv-address" formControlName="billingAddress" rows="3" maxlength="1000" [autoResize]="true"></textarea>
+      </s2s-form-field>
+      <details class="s2s-optional-details">
+        <summary>{{ 'common.moreDetails' | translate }}</summary>
+        <s2s-form-field labelKey="finance.notes" fieldId="inv-notes" [control]="form.controls.notes">
+          <textarea pTextarea id="inv-notes" formControlName="notes" rows="2" maxlength="2000" [autoResize]="true"></textarea>
+        </s2s-form-field>
+      </details>
+    </section>
+
+    <section class="s2s-panel">
+      <h2>{{ 'finance.lines' | translate }}</h2>
+      @if (editable()) {
+        <p class="s2s-muted small">{{ 'finance.extraHoursHint' | translate }}</p>
+      }
+      <div formArrayName="lines" class="rows">
+        @for (row of form.controls.lines.controls; track row; let n = $index) {
+          <div class="row-card" [formGroupName]="n" role="group" [attr.aria-label]="'finance.line' | translate: { no: n + 1 }">
+            <div class="row-head">
+              <strong>{{ 'finance.line' | translate: { no: n + 1 } }}</strong>
+              <p-tag [value]="'finance.source.' + row.controls.source.value | translate" [severity]="row.controls.source.value === 'QUOTATION' ? 'success' : 'warn'" />
+              @if (editable()) {
+                <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate" (onClick)="removeLine(n)" />
+              }
+            </div>
+            <div class="line-grid">
+              <s2s-form-field labelKey="finance.costHead" [fieldId]="'ln-head-' + n" [control]="row.controls.costHeadCode" [required]="true">
+                <p-select [inputId]="'ln-head-' + n" formControlName="costHeadCode" [options]="costHeadOptions()" optionLabel="label" optionValue="value"
+                  [placeholder]="'finance.chooseCostHead' | translate" appendTo="body" />
+              </s2s-form-field>
+              <s2s-form-field labelKey="finance.description" [fieldId]="'ln-desc-' + n" [control]="row.controls.description">
+                <input pInputText [id]="'ln-desc-' + n" formControlName="description" maxlength="300" />
+              </s2s-form-field>
+              <s2s-form-field labelKey="finance.quantity" [fieldId]="'ln-qty-' + n" [control]="row.controls.quantity" [required]="true" hintKey="finance.quantityError">
+                <input pInputText [id]="'ln-qty-' + n" formControlName="quantity" inputmode="decimal" />
+              </s2s-form-field>
+              <s2s-form-field labelKey="finance.unitPrice" [fieldId]="'ln-price-' + n" [control]="row.controls.unitPrice" [required]="true" hintKey="finance.priceError">
+                <input pInputText [id]="'ln-price-' + n" formControlName="unitPrice" inputmode="decimal" />
+              </s2s-form-field>
+            </div>
+            <p class="line-total">
+              {{ 'finance.amount' | translate }}: <strong>{{ money(totals().lines[n]?.amount ?? 0) }}</strong>
+            </p>
+          </div>
+        }
+      </div>
+      @if (editable()) { <p-button [label]="'finance.addLine' | translate" icon="pi pi-plus" [text]="true" (onClick)="addLine()" /> }
+    </section>
+  </form>
+}
+
+<p-dialog [header]="'finance.approve' | translate" [visible]="dialog() === 'approve'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'finance.approveHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'finance.approve' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="decide('APPROVE', null)" />
+  </ng-template>
+</p-dialog>
+<p-dialog [header]="'finance.issue' | translate" [visible]="dialog() === 'issue'" (visibleChange)="closeDialog($event)" [modal]="true" [draggable]="false"
+  [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'finance.issueHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'finance.issue' | translate" icon="pi pi-verified" [loading]="saving()" (onClick)="act('issue')" />
+  </ng-template>
+</p-dialog>
+<s2s-reason-dialog [visible]="dialog() === 'return'" (visibleChange)="closeDialog($event)" headerKey="finance.return" messageKey="finance.returnHint"
+  confirmKey="finance.return" [reasonRequired]="true" [saving]="saving()" (confirmed)="decide('RETURN', $event)" />

@@ -1,0 +1,128 @@
+<s2s-page-header [heading]="config().titleKey | translate" [subtitle]="config().subtitleKey | translate">
+  <p-button *s2sCan="config().writePermission" [label]="'common.add' | translate" icon="pi pi-plus" (onClick)="open(null)" />
+</s2s-page-header>
+
+<section class="s2s-panel">
+  <s2s-data-table
+    [columns]="config().columns"
+    [load]="load"
+    [params]="params()"
+    [actions]="actions()"
+    [searchable]="true"
+    [defaultSort]="config().defaultSort"
+    [captionKey]="config().titleKey">
+    <s2s-active-filter tableToolbar [(value)]="active" />
+  </s2s-data-table>
+</section>
+
+<p-dialog
+  [(visible)]="dialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: 'min(46rem, 96vw)' }"
+  [breakpoints]="{ '640px': '100vw' }"
+  [header]="record() ? heading() : (config().newKey | translate)">
+  <!-- Rendered only while open: the form group is built per record when the dialog opens. -->
+  @if (dialogOpen()) {
+  @if (record(); as current) {
+    @if (config().id === 'vessels') {
+      <p><a [routerLink]="['/technical/vessels', current.id]" (click)="dialogOpen.set(false)">Upload or view vessel GA plan →</a></p>
+    }
+    <div class="dialog-status">
+      <s2s-status-tag [active]="current.active !== false" />
+      @if (canWrite()) {
+        <p-button
+          [label]="(current.active !== false ? 'common.deactivate' : 'common.activate') | translate"
+          [severity]="current.active !== false ? 'secondary' : 'success'"
+          [outlined]="true"
+          size="small"
+          (onClick)="changeStatus(null)" />
+      }
+    </div>
+  }
+
+  @if (errorKey(); as key) {
+    <p-message severity="error" role="alert" [text]="key | translate" />
+  }
+
+  <form [formGroup]="form()" (ngSubmit)="save()" novalidate id="master-form">
+    <div class="s2s-form-grid">
+      @for (field of config().fields; track field.key) {
+        <s2s-form-field
+          [class.s2s-span-2]="field.span || field.type === 'textarea'"
+          [labelKey]="field.labelKey"
+          [fieldId]="'f-' + field.key"
+          [control]="form().controls[field.key]"
+          [required]="!!field.required"
+          [hintKey]="field.hintKey">
+          @switch (field.type) {
+            @case ('textarea') {
+              <textarea pTextarea [id]="'f-' + field.key" [formControlName]="field.key" rows="3" [attr.maxlength]="field.maxLength"></textarea>
+            }
+            @case ('integer') {
+              <p-inputnumber [inputId]="'f-' + field.key" [formControlName]="field.key" [min]="field.min" [max]="field.max" [useGrouping]="false" />
+            }
+            @case ('decimal') {
+              <p-inputnumber
+                [inputId]="'f-' + field.key"
+                [formControlName]="field.key"
+                mode="decimal"
+                [minFractionDigits]="0"
+                [maxFractionDigits]="field.fractionDigits ?? 2"
+                [min]="field.min"
+                [max]="field.max" />
+            }
+            @case ('select') {
+              <p-select
+                [inputId]="'f-' + field.key"
+                [formControlName]="field.key"
+                [options]="optionsFor(field)"
+                optionLabel="label"
+                optionValue="value"
+                [filter]="optionsFor(field).length > 8"
+                [showClear]="!!field.clearable"
+                appendTo="body"
+                [placeholder]="(field.clearable ? 'masters.pendingOrNone' : 'common.select') | translate" />
+            }
+            @case ('boolean') {
+              <div class="checkbox">
+                <p-checkbox [inputId]="'f-' + field.key" [formControlName]="field.key" [binary]="true" />
+              </div>
+            }
+            @case ('date') {
+              <p-datepicker [inputId]="'f-' + field.key" [formControlName]="field.key" dateFormat="yy-mm-dd" [showButtonBar]="true" appendTo="body" />
+            }
+            @default {
+              <input
+                pInputText
+                [id]="'f-' + field.key"
+                [formControlName]="field.key"
+                [attr.maxlength]="field.maxLength"
+                [attr.autocapitalize]="field.uppercase ? 'characters' : null"
+                autocomplete="off" />
+            }
+          }
+        </s2s-form-field>
+      }
+    </div>
+  </form>
+
+  @if (record() && canReadAudit()) {
+    <details class="history">
+      <summary>{{ 'audit.history' | translate }}</summary>
+      <s2s-audit-trail [entityType]="config().entityType" [entityId]="record()!.id" [pageSize]="10" />
+    </details>
+  }
+
+  }
+
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialogOpen.set(false)" />
+    @if (!readOnly()) {
+      @if (record()) {
+        <p-button [label]="'common.delete' | translate" icon="pi pi-trash" severity="danger" [outlined]="true" [loading]="saving()" (onClick)="confirmDelete(record()!)" />
+      }
+      <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="save()" />
+    }
+  </ng-template>
+</p-dialog>

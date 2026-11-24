@@ -1,0 +1,48 @@
+<section class="s2s-panel">
+  <header><h2>{{ 'inbox.title' | translate }} @if (data(); as page) { · {{ page.totalElements }} }</h2>
+    @if (compact()) { <a routerLink="/inbox">{{ 'inbox.all' | translate }}</a> }
+    <button type="button" (click)="reload()">{{ 'common.reload' | translate }}</button>
+  </header>
+  @if (!compact()) { <p>{{ 'inbox.hint' | translate }}</p> }
+  @if (error()) { <p role="alert">{{ error() | translate }}</p> }
+  @if (!compact()) {
+  <label>{{ 'inbox.filter' | translate }}<select [(ngModel)]="state" (ngModelChange)="filter()">
+    <option value="">{{ 'inbox.unresolved' | translate }}</option><option value="OPEN">{{ 'inbox.open' | translate }}</option>
+    <option value="ACKNOWLEDGED">{{ 'inbox.acknowledged' | translate }}</option><option value="RESOLVED">{{ 'inbox.resolved' | translate }}</option>
+  </select></label>
+  <label>{{ 'inbox.reason' | translate }}<input [(ngModel)]="reason" maxlength="500" /></label>
+  }
+  @if (data(); as current) {
+    @for (alert of current.items; track alert.id) {
+      <article [class.escalated]="alert.escalatedAt">
+        <a [routerLink]="alert.route ? ['/jobs', alert.jobId, alert.route] : ['/jobs', alert.jobId]">{{ alert.jobNumber }} · {{ alert.label }}</a>
+        <p>{{ 'inbox.' + alert.state.toLowerCase() | translate }} · {{ alert.createdAt | utcDateTime }}
+          @if (alert.dueAt) { · {{ 'inbox.due' | translate }}: {{ alert.dueAt | utcDateTime }} }
+          @if (alert.escalatedAt) { · <strong>{{ 'inbox.escalated' | translate }}</strong> }</p>
+        @if (!alert.conditionActive) { <p>{{ 'inbox.sourceCleared' | translate }}</p> }
+        @if (alert.resolutionReason) { <p>{{ alert.resolutionReason }}</p> }
+        @if (alert.state === 'OPEN') { <button type="button" [disabled]="busy()" (click)="action(alert, 'ACKNOWLEDGE')">{{ 'inbox.acknowledge' | translate }}</button> }
+        @if (!compact() && alert.state !== 'RESOLVED' && (!alert.conditionActive || alert.code === 'ETA_CHANGE' || alert.code === 'JOB_CHANGE')) {
+          <button type="button" [disabled]="busy() || !reason.trim()" (click)="action(alert, 'RESOLVE')">{{ 'inbox.resolve' | translate }}</button>
+        }
+      </article>
+    } @empty { <p>{{ 'inbox.empty' | translate }}</p> }
+    @if (!compact()) {
+      <footer><button type="button" [disabled]="page === 0" (click)="page = page - 1; reload()">{{ 'finance.previous' | translate }}</button>
+        <button type="button" [disabled]="(page + 1) * size() >= current.totalElements" (click)="page = page + 1; reload()">{{ 'finance.next' | translate }}</button></footer>
+    }
+  } @else { <p>{{ 'common.loading' | translate }}</p> }
+  @if (canConfigure() && !compact()) {
+    <details><summary (click)="loadRules()">{{ 'inbox.configuration' | translate }}</summary>
+      <p>{{ 'inbox.configurationHint' | translate }}</p>
+      @for (rule of rules(); track rule.code) {
+        <fieldset><legend>{{ rule.label }}</legend>
+          <label>{{ 'inbox.enabled' | translate }}<input type="checkbox" [(ngModel)]="rule.enabled" /></label>
+          <label>{{ 'inbox.lead' | translate }}<input type="number" min="0" max="525600" [(ngModel)]="rule.leadMinutes" /></label>
+          <label>{{ 'inbox.escalation' | translate }}<input type="number" min="1" max="525600" [(ngModel)]="rule.escalationMinutes" /></label>
+          <button type="button" [disabled]="busy() || !reason.trim()" (click)="saveRule(rule)">{{ 'common.save' | translate }}</button>
+        </fieldset>
+      }
+    </details>
+  }
+</section>

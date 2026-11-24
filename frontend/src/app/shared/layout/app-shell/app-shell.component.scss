@@ -1,0 +1,82 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 100;
+  background: var(--s2s-surface);
+  padding: 0.5rem 1rem;
+
+  &:focus {
+    left: 0.5rem;
+  }
+}
+
+.shell {
+  display: flex;
+  min-height: calc(100vh - var(--s2s-topbar-height));
+}
+
+.sidenav {
+  flex: 0 0 var(--s2s-sidenav-width);
+  width: var(--s2s-sidenav-width);
+  position: sticky;
+  top: var(--s2s-topbar-height);
+  align-self: flex-start;
+  height: calc(100vh - var(--s2s-topbar-height));
+  height: calc(100dvh - var(--s2s-topbar-height));
+}
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0; // lets wide tables scroll inside the page instead of stretching it
+  padding: 1.25rem 1.1rem 2.5rem;
+
+  @media (min-width: 992px) {
+    padding: 1.6rem clamp(1.75rem, 3vw, 3rem) 3rem;
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.content > :not(router-outlet) {
+  width: min(100%, 96rem);
+  margin-inline: auto;
+}
+
+.backdrop {
+  display: none;
+}
+
+// Below desktop width the navigation becomes an overlay drawer.
+@media (max-width: 991.98px) {
+  .sidenav {
+    position: fixed;
+    top: var(--s2s-topbar-height);
+    bottom: 0;
+    left: 0;
+    height: auto;
+    z-index: 30;
+    transform: translateX(-100%);
+    visibility: hidden;
+
+    &.open {
+      transform: none;
+      visibility: visible;
+    }
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: var(--s2s-topbar-height) 0 0 0;
+    z-index: 20;
+    background: rgb(24 18 22 / 56%);
+  }
+}

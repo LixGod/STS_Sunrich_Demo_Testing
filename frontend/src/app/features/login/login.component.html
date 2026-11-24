@@ -1,0 +1,36 @@
+<main class="login-page">
+  <section class="card" aria-labelledby="login-title">
+    <div class="brand">
+      <span class="brand-logo" aria-hidden="true"><img src="/s2s-logo.png" alt="" /></span>
+      <div>
+        <h1 id="login-title">Ship2Ship</h1>
+        <p class="s2s-muted">{{ 'auth.subtitle' | translate }}</p>
+      </div>
+    </div>
+
+    @if (expired()) {
+      <p-message severity="info" [text]="'auth.sessionExpired' | translate" />
+    }
+    @if (errorKey(); as key) {
+      <p-message severity="error" [text]="key | translate" role="alert" />
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <s2s-form-field labelKey="auth.username" fieldId="username" [control]="form.controls.username" [required]="true">
+        <input pInputText id="username" formControlName="username" autocomplete="username" autocapitalize="none" spellcheck="false" />
+      </s2s-form-field>
+
+      <s2s-form-field labelKey="auth.password" fieldId="password" [control]="form.controls.password" [required]="true">
+        <p-password
+          inputId="password"
+          formControlName="password"
+          [feedback]="false"
+          [toggleMask]="true"
+          autocomplete="current-password"
+          [fluid]="true" />
+      </s2s-form-field>
+
+      <p-button type="submit" [label]="'auth.signIn' | translate" [loading]="submitting()" [fluid]="true" />
+    </form>
+  </section>
+</main>

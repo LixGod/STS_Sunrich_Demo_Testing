@@ -1,0 +1,493 @@
+<s2s-page-header [heading]="overview()?.jobNumber ?? ''" [subtitle]="'jpo.title' | translate">
+  <p-button label="Job overview" icon="pi pi-briefcase" [text]="true" [routerLink]="['/jobs', jobId()]" />
+  <p-button [label]="'jpo.backToTechnical' | translate" icon="pi pi-arrow-left" [text]="true" [routerLink]="['/jobs', jobId(), 'technical']" />
+  <p-button [label]="'mooring.title' | translate" icon="pi pi-map" [text]="true" [routerLink]="['/jobs', jobId(), 'mooring-plan']" />
+  @if (canManageAnnex()) {
+    <p-button [label]="'jpo.annexLink' | translate" icon="pi pi-book" [text]="true" routerLink="/technical/annex" />
+  }
+  @if (overview()?.canCreate && overview()!.revisions.length) {
+    <p-button [label]="'jpo.newRevision' | translate" icon="pi pi-plus" [outlined]="true" [loading]="saving()" (onClick)="create()" />
+  }
+</s2s-page-header>
+
+@if (errorKey(); as key) {
+  <p-message severity="error" role="alert">
+    {{ key | translate }}
+    @if (key === 'errors.codes.STALE_VERSION') {
+      <p-button [label]="'common.reload' | translate" [text]="true" size="small" (onClick)="reload()" />
+    }
+  </p-message>
+}
+
+@if (overview(); as current) {
+  @if (current.revisions.length === 0) {
+    <section class="s2s-panel empty">
+      <s2s-empty-state messageKey="jpo.empty" icon="pi pi-map" />
+      @if (current.canCreate) {
+        <p-button [label]="'jpo.prepare' | translate" icon="pi pi-plus" [loading]="saving()" (onClick)="create()" />
+      }
+    </section>
+  } @else {
+    <div class="layout">
+      <nav class="s2s-panel revisions" [attr.aria-label]="'jpo.revisions' | translate">
+        <h2>{{ 'jpo.revisions' | translate }}</h2>
+        <ul>
+          @for (r of current.revisions; track r.id) {
+            <li>
+              <button type="button" [class.active]="r.id === selectedId()" [attr.aria-current]="r.id === selectedId() ? 'true' : null" (click)="select(r.id)">
+                <span>{{ 'jpo.revisionLabel' | translate: { no: r.revisionNo } }}</span>
+                <s2s-status-tag [status]="r.status" />
+              </button>
+            </li>
+          }
+        </ul>
+      </nav>
+
+      @if (revision(); as rev) {
+        <article class="detail" [attr.aria-busy]="loading() || saving()">
+          <section class="s2s-panel head">
+            <header class="detail-head">
+              <h2>{{ 'jpo.revisionLabel' | translate: { no: rev.revisionNo } }}</h2>
+              <s2s-status-tag [status]="rev.status" />
+            </header>
+            <div class="actions">
+              <a class="p-button p-button-outlined link-button" [href]="pdfUrl(rev)" [attr.download]="rev.pdfSha256 ? 'JPO-' + rev.revisionNo + '.pdf' : null" [attr.target]="rev.pdfSha256 ? null : '_blank'" rel="noopener">
+                <i class="pi pi-file-pdf" aria-hidden="true"></i> {{ (rev.pdfSha256 ? 'jpo.pdf' : 'jpo.pdfDraft') | translate }}
+              </a>
+              <a class="p-button p-button-outlined link-button" [href]="xlsxUrl(rev)" download>
+                <i class="pi pi-file-excel" aria-hidden="true"></i> {{ 'jpo.xlsx' | translate }}
+              </a>
+              @if (editable()) {
+                <p-button [label]="'common.save' | translate" icon="pi pi-check" [disabled]="!dirty()" [loading]="saving()" (onClick)="save()" />
+              }
+              @if (can().has('SUBMIT')) {
+                <p-button [label]="'jpo.submit' | translate" icon="pi pi-check-circle" [disabled]="form.invalid || (!dirty() && rev.blockers.length > 0)" [loading]="saving()" (onClick)="submit()" />
+              }
+              @if (can().has('APPROVE')) {
+                <p-button [label]="'jpo.approve' | translate" icon="pi pi-check-circle" (onClick)="dialog.set('approve')" />
+              }
+              @if (can().has('RETURN')) {
+                <p-button [label]="'jpo.return' | translate" icon="pi pi-undo" severity="danger" [outlined]="true" (onClick)="dialog.set('return')" />
+              }
+              @if (can().has('ISSUE')) {
+                <p-button [label]="'jpo.issue' | translate" icon="pi pi-verified" (onClick)="dialog.set('issue')" />
+              }
+              @if (can().has('ACCEPT')) {
+                <p-button [label]="'jpo.recordAcceptance' | translate" icon="pi pi-user-edit" (onClick)="openAccept()" />
+              }
+            </div>
+            @if (editable() && dirty()) {
+              <p class="s2s-muted hint">{{ 'jpo.saveFirst' | translate }}</p>
+            }
+            @if (rev.status === 'SUBMITTED' && !can().has('APPROVE') && can().has('RETURN')) {
+              <p class="s2s-muted hint">{{ 'jpo.ownSubmission' | translate }}</p>
+            }
+
+            @if (rev.returnedReason && rev.status === 'DRAFT') {
+              <p-message severity="warn" [text]="'jpo.returned' | translate: { reason: rev.returnedReason }" />
+            }
+            @if (rev.blockers.length) {
+              <div class="notice blockers" role="status">
+                <strong>{{ 'jpo.blockersTitle' | translate }}</strong>
+                <ul>
+                  @for (b of rev.blockers; track b.code) {
+                    <li>{{ blockerKey(b.code) | translate: { fallback: b.message } }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (rev.warnings.length) {
+              <details class="notice warnings">
+                <summary>{{ 'jpo.warningsTitle' | translate: { count: rev.warnings.length } }}</summary>
+                <ul>
+                  @for (w of rev.warnings; track $index) { <li>{{ w }}</li> }
+                </ul>
+                <p class="s2s-muted">{{ 'jpo.warningsHint' | translate }}</p>
+              </details>
+            }
+
+            <ul class="trail">
+              @if (rev.submittedAt) {
+                <li>{{ 'jpo.submittedBy' | translate: { name: rev.submittedByName, at: (rev.submittedAt | utcDateTime) } }}</li>
+              }
+              @if (rev.decidedAt) {
+                <li>{{ 'jpo.approvedBy' | translate: { name: rev.decidedByName, at: (rev.decidedAt | utcDateTime) } }}</li>
+              }
+              @if (rev.issuedAt) {
+                <li>{{ 'jpo.issuedBy' | translate: { name: rev.issuedByName, at: (rev.issuedAt | utcDateTime) } }}</li>
+              }
+            </ul>
+            @if (rev.pdfSha256) {
+              <p class="hash s2s-muted"><span>{{ 'jpo.pdfHash' | translate }}:</span> <code>{{ rev.pdfSha256 }}</code></p>
+            }
+          </section>
+
+          <!-- Job facts: live while a draft, frozen at submission -->
+          <details class="s2s-panel job-facts">
+            <summary>{{ 'jpo.section.job' | translate }} · {{ 'jpo.linked' | translate }}</summary>
+            <header class="section-head">
+              <h3>{{ 'jpo.section.job' | translate }}</h3>
+              <p-tag [value]="'jpo.linked' | translate" severity="success" />
+            </header>
+            <p class="s2s-muted hint">
+              {{ (rev.snapshotFrozen ? 'jpo.snapshotFrozen' : 'jpo.snapshotLive') | translate: { at: (rev.snapshot.takenAt | utcDateTime) } }}
+            </p>
+            <dl class="facts">
+              <div><dt>{{ 'jpo.operationType' | translate }}</dt><dd>{{ rev.snapshot.operationType ?? '—' }}</dd></div>
+            </dl>
+            <div class="table-wrap">
+              <table class="grid">
+                <thead><tr>
+                  <th scope="col">{{ 'jpo.vessel' | translate }}</th><th scope="col">{{ 'jpo.name' | translate }}</th>
+                  <th scope="col">IMO</th><th scope="col">ETA</th>
+                </tr></thead>
+                <tbody>
+                  @for (v of rev.snapshot.vessels; track v.jobVesselId) {
+                    <tr><td>{{ roleLabel(v.role) }}</td><td>{{ v.name }}</td><td>{{ v.imo }}</td><td>{{ v.etaUtc ? (v.etaUtc | utcDateTime: v.etaTimezone) : '—' }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="table-wrap">
+              <table class="grid">
+                <thead><tr><th scope="col">{{ 'jpo.cargo' | translate }}</th><th scope="col" class="num">{{ 'jpo.quantity' | translate }}</th></tr></thead>
+                <tbody>
+                  @for (c of rev.snapshot.cargo; track $index) {
+                    <tr><td>{{ c.gradeName }} ({{ c.gradeCode }})</td><td class="num">{{ c.quantity }} {{ c.unitCode }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <h4>{{ 'jpo.voyageTitle' | translate }}</h4>
+            @if (voyageRows().length) {
+              <div class="table-wrap">
+                <table class="grid">
+                  <thead><tr>
+                    <th scope="col">{{ 'jpo.value' | translate }}</th>
+                    @for (v of rev.snapshot.vessels; track v.jobVesselId) { <th scope="col" class="num">{{ v.name ?? roleLabel(v.role) }}</th> }
+                  </tr></thead>
+                  <tbody>
+                    @for (row of voyageRows(); track row.label) {
+                      <tr><td>{{ row.label }}</td>@for (value of row.values; track $index) { <td class="num">{{ value }}</td> }</tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <p class="s2s-muted">{{ 'jpo.noVoyage' | translate }}</p>
+            }
+            @if (rev.snapshot.checklists.length) {
+              <h4>{{ 'jpo.checklists' | translate }}</h4>
+              <ul class="plain">
+                @for (c of rev.snapshot.checklists; track $index) {
+                  <li>{{ c.name }} · {{ roleLabel(c.role) }} · <s2s-status-tag [status]="c.status" /></li>
+                }
+              </ul>
+            }
+          </details>
+
+          <form [formGroup]="form" (ngSubmit)="save()" novalidate class="sections">
+            @for (section of sections; track section.id) {
+              <section class="s2s-panel">
+                <header class="section-head">
+                  <h3>{{ 'jpo.section.' + section.id | translate }}</h3>
+                  @if (section.source && source(section.source) === 'MANUAL') {
+                    <p-tag [value]="'jpo.manual' | translate" severity="warn" [title]="'jpo.manualHint.' + section.source | translate" />
+                  }
+                  @if (section.source === 'mooringDiagram' && source('mooringDiagram') === 'LINKED') {
+                    <p-tag [value]="'jpo.linked' | translate" severity="info" />
+                  }
+                </header>
+                @if (section.source && source(section.source) === 'MANUAL') {
+                  <p class="s2s-muted hint">{{ 'jpo.manualHint.' + section.source | translate }}</p>
+                }
+                @if (section.source === 'mooringDiagram' && source('mooringDiagram') === 'LINKED') {
+                  <p><a [routerLink]="['/jobs', jobId(), 'mooring-plan']">{{ 'mooring.title' | translate }} →</a></p>
+                }
+                @if (section.id === 'operation') {
+                  <div class="fields">
+                    <s2s-form-field labelKey="jpo.field.operationDate" fieldId="jpo-date" [control]="form.controls.operationDate" [required]="true">
+                      <p-datepicker inputId="jpo-date" formControlName="operationDate" dateFormat="yy-mm-dd" appendTo="body" [showIcon]="true" />
+                    </s2s-form-field>
+                    <div class="checks">
+                      <span class="check"><p-checkbox formControlName="reverseLightering" [binary]="true" inputId="jpo-reverse" /> <label for="jpo-reverse">{{ 'jpo.field.reverseLightering' | translate }}</label></span>
+                      <span class="check"><p-checkbox formControlName="similarLoaBerthing" [binary]="true" inputId="jpo-similar" /> <label for="jpo-similar">{{ 'jpo.field.similarLoaBerthing' | translate }}</label></span>
+                    </div>
+                  </div>
+                }
+                <div class="fields">
+                  @for (def of section.fields; track def.key) {
+                    @if (source('mooringDiagram') !== 'LINKED' || (def.key !== 'mooringDiagramDocumentId' && def.key !== 'unmooringDiagramDocumentId')) {
+                    <div [class.wide]="def.wide">
+                      <s2s-form-field [labelKey]="'jpo.field.' + def.key" [fieldId]="'jpo-' + def.key" [control]="field(def.key)">
+                        @switch (def.kind) {
+                          @case ('area') {
+                            <textarea pTextarea [id]="'jpo-' + def.key" [formControl]="field(def.key)" rows="3" maxlength="2000" [autoResize]="true"></textarea>
+                          }
+                          @case ('choice') {
+                            <p-select [inputId]="'jpo-' + def.key" [formControl]="field(def.key)" [options]="choiceOptions()[def.key]" optionLabel="label"
+                              optionValue="value" [showClear]="true" appendTo="body" [placeholder]="'common.select' | translate" />
+                          }
+                          @case ('document') {
+                            <div class="document">
+                              <p-select [inputId]="'jpo-' + def.key" [formControl]="field(def.key)" [options]="documentOptions()" optionLabel="label"
+                                optionValue="value" [showClear]="true" [filter]="true" appendTo="body" [placeholder]="'jpo.chooseDocument' | translate" />
+                              @if (field(def.key).value) {
+                                <p-button icon="pi pi-eye" [text]="true" [ariaLabel]="'jpo.viewDocument' | translate" (onClick)="view(field(def.key).value)" />
+                              }
+                            </div>
+                          }
+                          @case ('number') {
+                            <input pInputText [id]="'jpo-' + def.key" [formControl]="field(def.key)" inputmode="decimal" />
+                          }
+                          @default {
+                            <input pInputText [id]="'jpo-' + def.key" [formControl]="field(def.key)" maxlength="2000" />
+                          }
+                        }
+                      </s2s-form-field>
+                    </div>
+                    }
+                  }
+                </div>
+
+                @if (section.id === 'approach') {
+                  <!-- Operating limits for separation -->
+                  <header class="section-head sub">
+                    <h4>{{ 'jpo.section.limits' | translate }}</h4>
+                    @if (source('operatingLimits') === 'MANUAL') { <p-tag [value]="'jpo.manual' | translate" severity="warn" /> }
+                  </header>
+                  @if (source('operatingLimits') === 'LINKED') {
+                    <p class="s2s-muted hint">{{ 'jpo.linkedLimits' | translate: { no: rev.snapshot.operatingLimitsRevision } }}</p>
+                    <div class="table-wrap">
+                      <table class="grid">
+                        <thead><tr>
+                          <th scope="col">{{ 'weather.parameter' | translate }}</th><th scope="col">{{ 'weather.operation' | translate }}</th>
+                          <th scope="col">{{ 'weather.threshold' | translate }}</th><th scope="col">{{ 'weather.action' | translate }}</th>
+                        </tr></thead>
+                        <tbody>
+                          @for (l of rev.snapshot.operatingLimits; track $index) {
+                            <tr><td>{{ l.parameterLabel }}</td><td>{{ l.operation }}</td>
+                              <td>{{ 'weather.side.' + l.comparison | translate }} {{ l.threshold }} {{ l.unit }}</td><td>{{ l.action }}</td></tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  } @else {
+                  <p class="s2s-muted hint">{{ 'jpo.manualHint.operatingLimits' | translate }}</p>
+                  }
+                  @if (canReadWeather()) {
+                    <a class="weather-link" [routerLink]="['/jobs', jobId(), 'weather']">{{ 'job.weatherLink' | translate }} →</a>
+                  }
+                  <div formArrayName="operatingLimits" class="rows" [hidden]="source('operatingLimits') === 'LINKED'">
+                    @for (row of form.controls.operatingLimits.controls; track row; let i = $index) {
+                      <div class="row-card" [formGroupName]="i">
+                        <s2s-form-field labelKey="jpo.limit.parameter" [fieldId]="'lim-p-' + i" [control]="row.controls.parameter" [required]="true">
+                          <input pInputText [id]="'lim-p-' + i" formControlName="parameter" maxlength="100" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.limit.limit" [fieldId]="'lim-l-' + i" [control]="row.controls.limit" [required]="true">
+                          <input pInputText [id]="'lim-l-' + i" formControlName="limit" maxlength="100" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.limit.unit" [fieldId]="'lim-u-' + i" [control]="row.controls.unit">
+                          <input pInputText [id]="'lim-u-' + i" formControlName="unit" maxlength="20" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.limit.action" [fieldId]="'lim-a-' + i" [control]="row.controls.action" [required]="true">
+                          <input pInputText [id]="'lim-a-' + i" formControlName="action" maxlength="300" />
+                        </s2s-form-field>
+                        @if (editable()) {
+                          <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate"
+                            (onClick)="removeRow(form.controls.operatingLimits, i)" />
+                        }
+                      </div>
+                    } @empty {
+                      <p class="s2s-muted">{{ 'jpo.noLimits' | translate }}</p>
+                    }
+                  </div>
+                  @if (editable() && source('operatingLimits') !== 'LINKED') {
+                    <p-button [label]="'jpo.addLimit' | translate" icon="pi pi-plus" [text]="true" (onClick)="addLimit()" />
+                  }
+                }
+
+                @if (section.id === 'security') {
+                  <h4>{{ 'jpo.section.cargoRates' | translate }}</h4>
+                  <div formArrayName="cargoRates" class="rows">
+                    @for (row of form.controls.cargoRates.controls; track row; let i = $index) {
+                      <div class="row-card" [formGroupName]="i">
+                        <div class="row-label">{{ row.controls.cargoGradeCode.value }}</div>
+                        <s2s-form-field labelKey="jpo.rate.max" [fieldId]="'rate-' + i" [control]="row.controls.maxRatePerLine">
+                          <input pInputText [id]="'rate-' + i" formControlName="maxRatePerLine" inputmode="decimal" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.rate.unit" [fieldId]="'rate-u-' + i" [control]="row.controls.rateUnit">
+                          <input pInputText [id]="'rate-u-' + i" formControlName="rateUnit" maxlength="20" />
+                        </s2s-form-field>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (section.id === 'unmooring') {
+                  <header class="section-head sub">
+                    <h4>{{ 'jpo.section.equipment' | translate }}</h4>
+                    @if (source('equipment') === 'MANUAL') { <p-tag [value]="'jpo.manual' | translate" severity="warn" /> }
+                  </header>
+                  @if (source('equipment') === 'MANUAL') { <p class="s2s-muted hint">{{ 'jpo.manualHint.equipment' | translate }}</p> }
+                  @if (source('equipment') === 'LINKED') {
+                    <p>Allocated fenders and hoses are added to the JPO automatically.</p>
+                    <ul class="plain">@for (asset of rev.snapshot.allocatedResources ?? []; track asset.identifier) {
+                      @if (asset.kind === 'ASSET' && asset.category) { <li>{{ asset.identifier }} · {{ 'jpo.choice.' + asset.category | translate }}@if (asset.dimensions) { · {{ asset.dimensions }} }</li> }
+                    }</ul>
+                    @if (canReadResources()) { <a [routerLink]="['/jobs', jobId(), 'resources']">Review equipment allocation →</a> }
+                  }
+                  <div formArrayName="equipment" class="rows">
+                    @for (row of form.controls.equipment.controls; track row; let i = $index) {
+                      @if (!hasAllocatedEquipment(row.controls.category.value)) {
+                      <div class="row-card" [formGroupName]="i">
+                        <div class="row-label">{{ 'jpo.choice.' + row.controls.category.value | translate }}</div>
+                        <s2s-form-field labelKey="jpo.equipment.number" [fieldId]="'eq-n-' + i" [control]="row.controls.number">
+                          <p-inputnumber [inputId]="'eq-n-' + i" formControlName="number" [useGrouping]="false" [min]="0" [max]="999" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.equipment.dimensions" [fieldId]="'eq-d-' + i" [control]="row.controls.dimensions">
+                          <input pInputText [id]="'eq-d-' + i" formControlName="dimensions" maxlength="200" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.equipment.strings" [fieldId]="'eq-s-' + i" [control]="row.controls.strings">
+                          <p-inputnumber [inputId]="'eq-s-' + i" formControlName="strings" [useGrouping]="false" [min]="0" [max]="99" />
+                        </s2s-form-field>
+                      </div>
+                      }
+                    }
+                  </div>
+                  <h4>{{ 'jpo.section.ancillary' | translate }}</h4>
+                  <div formArrayName="ancillary" class="rows">
+                    @for (row of form.controls.ancillary.controls; track row; let i = $index) {
+                      <div class="row-card" [formGroupName]="i">
+                        <s2s-form-field labelKey="jpo.ancillary.item" [fieldId]="'an-i-' + i" [control]="row.controls.item" [required]="true">
+                          <input pInputText [id]="'an-i-' + i" formControlName="item" maxlength="100" />
+                        </s2s-form-field>
+                        <s2s-form-field labelKey="jpo.ancillary.value" [fieldId]="'an-v-' + i" [control]="row.controls.value">
+                          <input pInputText [id]="'an-v-' + i" formControlName="value" maxlength="200" />
+                        </s2s-form-field>
+                        @if (editable()) {
+                          <p-button icon="pi pi-trash" [text]="true" severity="danger" [ariaLabel]="'common.remove' | translate"
+                            (onClick)="removeRow(form.controls.ancillary, i)" />
+                        }
+                      </div>
+                    }
+                  </div>
+                  @if (editable()) {
+                    <p-button [label]="'jpo.addAncillary' | translate" icon="pi pi-plus" [text]="true" (onClick)="addAncillary()" />
+                  }
+                }
+              </section>
+            }
+          </form>
+
+          <!-- Acceptances -->
+          @if (rev.status === 'DONE' || rev.status === 'ISSUED' || rev.status === 'SUPERSEDED') {
+            <section class="s2s-panel">
+              <header class="section-head"><h3>{{ 'jpo.section.acceptance' | translate }}</h3></header>
+              <div class="table-wrap">
+                <table class="grid">
+                  <thead><tr>
+                    <th scope="col">{{ 'jpo.acceptance.party' | translate }}</th><th scope="col">{{ 'jpo.acceptance.name' | translate }}</th>
+                    <th scope="col">{{ 'jpo.acceptance.at' | translate }}</th><th scope="col">{{ 'jpo.acceptance.signed' | translate }}</th>
+                  </tr></thead>
+                  <tbody>
+                    @for (a of rev.acceptances; track a.party) {
+                      <tr>
+                        <td>{{ 'jpo.party.' + a.party | translate }}</td><td>{{ a.personName }}</td><td>{{ a.acceptedAt | utcDateTime }}</td>
+                        <td>@if (a.signedDocumentId) { <button type="button" class="link" (click)="view(a.signedDocumentId)">{{ documentName(a.signedDocumentId) }}</button> } @else { — }</td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="4" class="s2s-muted">{{ 'jpo.noAcceptances' | translate }}</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          }
+
+          <!-- Annex -->
+          @if (rev.annexSections.length) {
+          <section class="s2s-panel">
+            <header class="section-head">
+              <h3>{{ 'jpo.section.annex' | translate }}</h3>
+              @if (rev.annexTemplateVersion) {
+                <span class="s2s-muted">{{ 'jpo.annexVersion' | translate: { no: rev.annexTemplateVersion } }}</span>
+              }
+            </header>
+            @for (a of rev.annexSections; track a.code) {
+              <details class="annex">
+                <summary>{{ a.title }}</summary>
+                <p class="pre">{{ a.body || ('jpo.annexEmpty' | translate) }}</p>
+              </details>
+            }
+          </section>
+          }
+        </article>
+      }
+    </div>
+  }
+}
+
+<!-- Approve / issue confirmations -->
+<p-dialog [header]="'jpo.approve' | translate" [visible]="dialog() === 'approve'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'jpo.approveHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'jpo.approve' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="decide('APPROVE', null)" />
+  </ng-template>
+</p-dialog>
+
+<p-dialog [header]="'jpo.issue' | translate" [visible]="dialog() === 'issue'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(32rem, 96vw)' }">
+  <p>{{ 'jpo.issueHint' | translate }}</p>
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'jpo.issue' | translate" icon="pi pi-verified" [loading]="saving()" (onClick)="issue()" />
+  </ng-template>
+</p-dialog>
+
+<s2s-reason-dialog
+  [visible]="dialog() === 'return'"
+  (visibleChange)="closeDialog($event)"
+  headerKey="jpo.return"
+  messageKey="jpo.returnHint"
+  confirmKey="jpo.return"
+  [reasonRequired]="true"
+  [saving]="saving()"
+  (confirmed)="decide('RETURN', $event)" />
+
+<!-- Acceptance -->
+<p-dialog [header]="'jpo.recordAcceptance' | translate" [visible]="dialog() === 'accept'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [style]="{ width: 'min(36rem, 96vw)' }">
+  @if (dialog() === 'accept') {
+    <p class="s2s-muted">{{ 'jpo.acceptHint' | translate }}</p>
+    @if (dialogError(); as key) {
+      <p-message severity="error" role="alert" [text]="key | translate" />
+    }
+    <form [formGroup]="acceptForm" (ngSubmit)="saveAccept()" novalidate class="dialog-form">
+      <s2s-form-field labelKey="jpo.acceptance.party" fieldId="acc-party" [control]="acceptForm.controls.party" [required]="true">
+        <p-select inputId="acc-party" formControlName="party" [options]="partyOptions()" optionLabel="label" optionValue="value" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="jpo.acceptance.name" fieldId="acc-name" [control]="acceptForm.controls.personName" [required]="true">
+        <input pInputText id="acc-name" formControlName="personName" maxlength="150" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="jpo.acceptance.at" fieldId="acc-at" [control]="acceptForm.controls.acceptedAt" [required]="true">
+        <s2s-date-time-picker inputId="acc-at" formControlName="acceptedAt" appendTo="body" />
+      </s2s-form-field>
+      <s2s-form-field labelKey="jpo.acceptance.signed" fieldId="acc-doc" [control]="acceptForm.controls.signedDocumentId" hintKey="jpo.acceptance.signedHint">
+        <p-select inputId="acc-doc" formControlName="signedDocumentId" [options]="documentOptions()" optionLabel="label" optionValue="value"
+          [showClear]="true" [filter]="true" appendTo="body" [placeholder]="'jpo.chooseDocument' | translate" />
+      </s2s-form-field>
+    </form>
+  }
+  <ng-template #footer>
+    <p-button [label]="'common.cancel' | translate" [text]="true" severity="secondary" (onClick)="dialog.set(null)" />
+    <p-button [label]="'common.save' | translate" icon="pi pi-check" [loading]="saving()" (onClick)="saveAccept()" />
+  </ng-template>
+</p-dialog>
+
+<p-dialog [header]="viewing()?.name ?? ''" [visible]="dialog() === 'view'" (visibleChange)="closeDialog($event)"
+  [modal]="true" [draggable]="false" [maximizable]="true" [style]="{ width: 'min(60rem, 96vw)' }">
+  <s2s-document-viewer [file]="viewing()" />
+</p-dialog>

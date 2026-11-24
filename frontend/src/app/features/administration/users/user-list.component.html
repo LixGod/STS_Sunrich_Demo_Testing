@@ -1,0 +1,24 @@
+<s2s-page-header [heading]="'nav.users' | translate" [subtitle]="'users.subtitle' | translate">
+  <p-button *s2sCan="permissions.adminUserWrite" [label]="'common.add' | translate" icon="pi pi-plus" routerLink="new" />
+</s2s-page-header>
+
+<section class="s2s-panel">
+  <s2s-data-table
+    [columns]="columns"
+    [load]="load"
+    [params]="params()"
+    [actions]="actions"
+    defaultSort="fullName,asc"
+    captionKey="nav.users">
+    <p-select
+      tableToolbar
+      [options]="statusOptions()"
+      optionLabel="label"
+      optionValue="value"
+      [showClear]="true"
+      [placeholder]="'filters.all' | translate"
+      [ariaLabel]="'filters.status' | translate"
+      [ngModel]="status()"
+      (ngModelChange)="status.set($event ?? null)" />
+  </s2s-data-table>
+</section>

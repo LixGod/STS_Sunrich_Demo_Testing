@@ -1,0 +1,21 @@
+<p-datepicker
+  [inputId]="inputId()"
+  [ngModel]="draft()"
+  (ngModelChange)="changed($event)"
+  (onHide)="cancel()"
+  (onBlur)="touched()"
+  [disabled]="disabled()"
+  [showTime]="true"
+  [hideOnDateTimeSelect]="false"
+  [appendTo]="appendTo() ?? undefined"
+  hourFormat="24"
+  dateFormat="yy-mm-dd">
+  <ng-template #footer>
+    <div class="picker-footer">
+      @if (clearable()) {
+        <p-button [label]="'common.clear' | translate" [text]="true" severity="secondary" size="small" (onClick)="clear()" />
+      }
+      <p-button [label]="'common.apply' | translate" icon="pi pi-check" size="small" (onClick)="apply()" />
+    </div>
+  </ng-template>
+</p-datepicker>

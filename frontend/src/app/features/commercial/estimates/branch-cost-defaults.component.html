@@ -1,0 +1,78 @@
+<s2s-page-header [heading]="'estimate.branchDefaults' | translate" [subtitle]="'estimate.branchDefaultsHint' | translate" />
+
+<div class="defaults-page">
+  <section class="s2s-panel branch-panel">
+    <div><h2>Branch</h2><p>Choose the branch whose estimate defaults you want to manage.</p></div>
+    <select id="default-branch" [value]="branchId()" (change)="selectBranch($any($event.target).value)" aria-label="Branch">
+      @for (branch of branches(); track branch.value) { <option [value]="branch.value">{{ branch.label }}</option> }
+    </select>
+  </section>
+
+  @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
+
+  <section class="s2s-panel editor-panel">
+    <div class="section-heading"><div><h2>Add equipment</h2><p>Select an inventory item. Its cost head and rate are copied into this branch's estimate defaults.</p></div></div>
+    <div class="add-row">
+      <label class="field">Equipment inventory
+        <select [value]="selectedId()" (change)="selectEquipment($any($event.target).value)">
+          <option value="">Select equipment</option>
+          @for (model of equipment(); track model.modelId) {
+            <option [value]="model.modelId" [disabled]="alreadyAdded(model.modelId)">{{ model.name }} · {{ model.categoryLabel }}{{ alreadyAdded(model.modelId) ? ' · Added' : '' }}</option>
+          }
+        </select>
+      </label>
+      <button class="save-button" type="button" (click)="add()" [disabled]="!selected() || saving()"><i class="pi pi-plus" aria-hidden="true"></i> Add to branch</button>
+    </div>
+    @if (selected(); as model) {
+      <p class="rate-preview">Inventory rate: <strong>{{ model.standardRateCurrency ?? '—' }} {{ model.standardRate ?? 'Not set' }}</strong>
+      </p>
+      @if (model.standardRateCurrency !== 'USD') {
+        <label class="field">Branch default unit price (USD)
+          <input type="number" min="0" step="0.0001" [value]="manualUsdPrice()" (input)="manualUsdPrice.set($any($event.target).value)" />
+        </label>
+      }
+    }
+    @if (!equipment().length) { <p class="form-hint">No equipment is available. Add a model and rate in Equipment Inventory first.</p> }
+  </section>
+
+  <section class="s2s-panel lines-panel">
+    <div class="section-heading">
+      <div><h2>Branch cost lines</h2><p>Active lines are copied into the branch's first estimate. Inventory rate changes do not change existing defaults.</p></div>
+      <span class="count">{{ rows().length }} {{ rows().length === 1 ? 'line' : 'lines' }}</span>
+    </div>
+    @if (rows().length) {
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Equipment</th><th class="number">USD rate</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td>{{ equipmentName(row) }}</td>
+                <td class="number">
+                  @if (editingId() === row.id) {
+                    <input class="rate-input" type="number" min="0" step="0.0001" aria-label="USD rate" [value]="editPrice()" (input)="editPrice.set($any($event.target).value)" />
+                  } @else {
+                    {{ row.unitPrice }}
+                  }
+                </td>
+                <td><span class="status" [class.inactive]="!row.active">{{ row.active ? 'Active' : 'Inactive' }}</span></td>
+                <td class="actions-cell">
+                  @if (editingId() === row.id) {
+                    <button class="edit-button" type="button" (click)="saveEdit(row)" [disabled]="saving()">Save</button>
+                    <button class="edit-button muted" type="button" (click)="cancelEdit()" [disabled]="saving()">Cancel</button>
+                  } @else {
+                    <button class="edit-button" type="button" (click)="startEdit(row)" [disabled]="saving()">Edit</button>
+                    <button class="edit-button" type="button" (click)="toggle(row)" [disabled]="saving()">{{ row.active ? 'Deactivate' : 'Activate' }}</button>
+                    <button class="edit-button danger" type="button" (click)="confirmDelete(row)" [disabled]="saving()">Delete</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state"><i class="pi pi-inbox" aria-hidden="true"></i><strong>No cost lines yet</strong><span>Choose equipment above to add the first line.</span></div>
+    }
+  </section>
+</div>

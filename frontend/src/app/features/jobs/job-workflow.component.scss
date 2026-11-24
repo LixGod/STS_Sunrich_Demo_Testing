@@ -1,0 +1,55 @@
+:host { display: block; }
+
+form, label { display: grid; gap: 0.45rem; }
+form { margin-block: 0.6rem; max-width: 40rem; }
+
+textarea,
+button {
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+  min-height: 44px;
+  border: 1px solid var(--s2s-border);
+  border-radius: 0.65rem;
+  background: var(--s2s-surface);
+  color: inherit;
+}
+
+textarea { min-height: 5rem; resize: vertical; }
+
+button {
+  cursor: pointer;
+  background: var(--s2s-brand);
+  color: #fff;
+  border-color: var(--s2s-brand);
+  font-weight: 600;
+  width: fit-content;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+details {
+  color: var(--s2s-text-muted);
+}
+
+.workflow-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: var(--s2s-radius);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  font-size: 0.88rem;
+  font-weight: 500;
+  margin-block: 0.35rem;
+
+  i {
+    font-size: 1rem;
+    color: #2563eb;
+    flex-shrink: 0;
+  }
+}

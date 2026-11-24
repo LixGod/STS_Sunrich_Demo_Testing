@@ -1,0 +1,32 @@
+@if (error()) { <p role="alert">{{ error() | translate }}</p> }
+@if (data(); as current) {
+  <div class="approval-actions">
+    @if (current.canRequest && current.status === 'PLANNING' && !current.readinessRequestedBy) {
+      <button type="button" [disabled]="busy()" (click)="save('READINESS')">{{ 'job.workflow.requestReadiness' | translate }}</button>
+    }
+    @if (current.canRequest && current.status === 'FINANCIAL_CLOSING' && !current.closureRequestedBy) {
+      <button type="button" [disabled]="busy()" (click)="save('CLOSURE')">{{ 'job.workflow.requestClosure' | translate }}</button>
+    }
+    @if (!selected() && (current.readinessRequestedBy && current.status === 'PLANNING' || current.closureRequestedBy && current.status === 'FINANCIAL_CLOSING')) {
+      <div class="workflow-notice" role="status">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span>{{ 'job.workflow.awaitingColleague' | translate }}</span>
+      </div>
+    }
+    @if (selected(); as action) {
+      <form (ngSubmit)="save()">
+        @if (action.blockers.length) {
+          <details><summary>{{ 'job.workflow.blockers' | translate }}</summary>
+            <ul>@for (issue of action.blockers; track issue.code) { <li>{{ issue.message }}</li> }</ul>
+          </details>
+        }
+        @if (current.canOverride && action.blockers.length) {
+          <label for="job-override">{{ 'job.workflow.override' | translate }}
+            <textarea id="job-override" name="override" [(ngModel)]="overrideReason" maxlength="500"></textarea>
+          </label>
+        }
+        <button type="submit" [disabled]="busy() || action.blockers.length > 0 && !overrideReason.trim()">{{ 'job.workflow.advance' | translate }} → {{ 'status.' + action.to | translate }}</button>
+      </form>
+    }
+  </div>
+}
