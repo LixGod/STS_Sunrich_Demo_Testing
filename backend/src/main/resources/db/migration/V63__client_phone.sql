@@ -1,0 +1,1 @@
+ALTER TABLE client ADD COLUMN phone VARCHAR(40) NULL AFTER country_code;

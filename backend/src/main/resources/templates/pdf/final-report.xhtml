@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title th:text="${r.reference}">Final report</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm 18mm 14mm;
+      @bottom-left { content: element(docid); }
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: sans-serif; font-size: 8pt; color: #666; } }
+    body { font-family: sans-serif; font-size: 9pt; color: #1f2933; }
+    .docid { position: running(docid); font-size: 7pt; color: #888; }
+    .cover { text-align: center; margin: 30mm 0 12mm; }
+    .cover h1 { font-size: 20pt; color: #7a1f2b; margin: 0 0 3mm; }
+    .cover .sub { font-size: 11pt; color: #5f6b7a; }
+    h2 { font-size: 10.5pt; margin: 6mm 0 1.5mm; color: #7a1f2b; border-bottom: 0.5pt solid #c9ced6; padding-bottom: 1mm; page-break-after: avoid; }
+    h3 { font-size: 9.5pt; margin: 3mm 0 1mm; }
+    table { width: 100%; border-collapse: collapse; }
+    table.facts th { text-align: left; width: 32%; padding: 1mm 2mm 1mm 0; vertical-align: top; }
+    table.facts td { padding: 1mm 0; vertical-align: top; }
+    table.grid th { background: #f1f3f6; text-align: left; padding: 1.2mm; border-bottom: 0.5pt solid #c9ced6; }
+    table.grid td { padding: 1.2mm; border-bottom: 0.5pt solid #e3e6ea; vertical-align: top; white-space: pre-wrap; }
+    tr { page-break-inside: avoid; }
+    .text { white-space: pre-wrap; }
+    .muted { color: #5f6b7a; }
+    .none { color: #5f6b7a; font-style: italic; }
+    .draft { position: fixed; top: 110mm; left: 10mm; width: 160mm; text-align: center; font-size: 72pt; font-weight: bold;
+      color: #d9d9d9; transform: rotate(-30deg); z-index: -1; }
+  </style>
+</head>
+<body>
+  <div class="docid" th:text="${'Document ' + r.documentId + ' · template v' + r.templateVersion}">Document</div>
+  <div class="draft" th:if="${r.draft}">DRAFT</div>
+
+  <div class="cover">
+    <h1>STS Operation Report — Final Report</h1>
+    <div class="sub" th:text="${r.reference}">Reference</div>
+  </div>
+
+  <table class="facts">
+    <tr><th>Client</th><td th:text="${r.client}">Client</td></tr>
+    <tr th:each="v : ${r.vessels}"><th th:text="${v.first}">Vessel</th><td th:text="${v.second}">Name</td></tr>
+    <tr><th>Cargo</th><td><span th:each="c, st : ${r.cargo}"><span th:text="${c}">Cargo</span><br th:if="${!st.last}"/></span></td></tr>
+    <tr><th>Working VHF channel</th><td th:text="${r.vhf}">VHF</td></tr>
+    <tr><th>Date</th><td th:text="${r.date}">Date</td></tr>
+    <tr><th>Times</th><td th:text="${'Local time, ' + r.timezone}">Zone</td></tr>
+  </table>
+
+  <h2>Executive summary</h2>
+  <div class="text" th:text="${r.summary}">Summary</div>
+
+  <h2>Q88 references</h2>
+  <table class="grid" th:if="${!r.q88.isEmpty()}">
+    <thead><tr><th>Vessel</th><th>IMO</th><th>Q88 document</th><th>Received</th></tr></thead>
+    <tbody><tr th:each="row : ${r.q88}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+  <p class="none" th:if="${r.q88.isEmpty()}">No Q88 document on file.</p>
+
+  <h2>Equipment and resources</h2>
+  <table class="grid" th:if="${!r.equipment.isEmpty()}">
+    <thead><tr><th>Type</th><th>Description</th><th>Units</th></tr></thead>
+    <tbody><tr th:each="row : ${r.equipment}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+  <p class="none" th:if="${r.equipment.isEmpty()}">None entered.</p>
+
+  <h2>Supervision and attendance</h2>
+  <table class="grid">
+    <thead><tr><th>Capacity</th><th>Name</th></tr></thead>
+    <tbody><tr th:each="row : ${r.attendance}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+
+  <h2>Sequence of events — berthing and transfer</h2>
+  <table class="grid" th:if="${!r.berthing.isEmpty()}">
+    <thead><tr><th>Time</th><th>Event</th><th>Vessel</th><th>Remarks</th></tr></thead>
+    <tbody><tr th:each="row : ${r.berthing}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+  <p class="none" th:if="${r.berthing.isEmpty()}">No events recorded.</p>
+
+  <h2>Cargo transfer progress</h2>
+  <div th:each="g : ${r.cargoProgress}">
+    <h3 th:text="${g.title}">Grade</h3>
+    <table class="grid">
+      <thead><tr><th>Time</th><th>Total transferred</th><th>Balance</th><th>Rate per hour (last interval)</th><th>Remarks</th></tr></thead>
+      <tbody><tr th:each="row : ${g.rows}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Completion</h2>
+  <table class="grid" th:if="${!r.completion.isEmpty()}">
+    <thead><tr><th>Time</th><th>Event</th><th>Vessel</th><th>Remarks</th></tr></thead>
+    <tbody><tr th:each="row : ${r.completion}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+  <p class="none" th:if="${r.completion.isEmpty()}">No completion events recorded.</p>
+
+  <h2>Incidents and delays</h2>
+  <table class="grid" th:if="${!r.incidents.isEmpty()}">
+    <thead><tr><th>Time</th><th>Incident</th><th>Description</th><th>Status</th></tr></thead>
+    <tbody><tr th:each="row : ${r.incidents}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+  <table class="grid" th:if="${!r.delays.isEmpty()}">
+    <thead><tr><th>Period</th><th>Delay</th><th>Description</th></tr></thead>
+    <tbody><tr th:each="row : ${r.delays}"><td th:each="cell : ${row}" th:text="${cell}">c</td></tr></tbody>
+  </table>
+  <p class="none" th:if="${r.incidents.isEmpty() and r.delays.isEmpty()}">None recorded in the operations log.</p>
+
+  <h2>Remarks</h2>
+  <div class="text" th:text="${r.remarks}">Remarks</div>
+
+  <h2>Attachments</h2>
+  <ul th:if="${!r.attachments.isEmpty()}"><li th:each="a : ${r.attachments}" th:text="${a}">A</li></ul>
+  <p class="none" th:if="${r.attachments.isEmpty()}">None.</p>
+  <p class="muted" th:text="${r.sof}">SOF</p>
+  <p class="muted" th:text="${r.approval}">Approval</p>
+</body>
+</html>

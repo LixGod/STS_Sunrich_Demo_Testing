@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title th:text="${j.jobNumber + ' JPO'}">JPO</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm 18mm 14mm;
+      @top-right { content: element(running); }
+      @bottom-center { content: "Page " counter(page) " of " counter(pages); font-family: sans-serif; font-size: 8pt; color: #666; } }
+    body { font-family: sans-serif; font-size: 9pt; color: #1f2933; }
+    .running { position: running(running); font-size: 7.5pt; color: #666; text-align: right; }
+    h1 { font-size: 15pt; margin: 0 0 1mm; color: #7a1f2b; }
+    h2 { font-size: 10pt; margin: 5mm 0 1.5mm; color: #7a1f2b; border-bottom: 0.5pt solid #c9ced6; padding-bottom: 1mm;
+      page-break-after: avoid; }
+    h3 { font-size: 9pt; margin: 3mm 0 1mm; }
+    .muted { color: #5f6b7a; }
+    table { width: 100%; border-collapse: collapse; }
+    table.rows th { text-align: left; width: 38%; font-weight: bold; padding: 1mm 2mm 1mm 0; vertical-align: top; }
+    table.rows td { padding: 1mm 0; vertical-align: top; white-space: pre-wrap; }
+    table.grid { margin-top: 1mm; }
+    table.grid th { background: #f1f3f6; text-align: left; padding: 1.2mm; border-bottom: 0.5pt solid #c9ced6; }
+    table.grid td { padding: 1.2mm; border-bottom: 0.5pt solid #e3e6ea; vertical-align: top; white-space: pre-wrap; }
+    tr { page-break-inside: avoid; }
+    .note { font-size: 8pt; color: #5f6b7a; margin-top: 1mm; }
+    .diagram { margin-top: 2mm; page-break-inside: avoid; }
+    .diagram img { max-width: 180mm; max-height: 200mm; }
+    .annex { white-space: pre-wrap; text-align: justify; }
+    .annex-start { page-break-before: always; }
+    .draft { position: fixed; top: 110mm; left: 10mm; width: 160mm; text-align: center; font-size: 72pt; font-weight: bold;
+      color: #d9d9d9; transform: rotate(-30deg); z-index: -1; }
+  </style>
+</head>
+<body>
+  <div class="running" th:text="${j.jobNumber + ' · JPO revision ' + j.revisionNo}">Job</div>
+  <div class="draft" th:if="${j.draft}">DRAFT</div>
+
+  <h1 th:text="${j.title}">Joint Plan of Operation</h1>
+  <div class="muted" th:text="${j.jobNumber + ' · revision ' + j.revisionNo}">Job</div>
+
+  <div th:each="s : ${j.sections}">
+    <h2 th:text="${s.title}">Section</h2>
+    <table class="rows" th:if="${!s.rows.isEmpty()}">
+      <tr th:each="row : ${s.rows}"><th th:text="${row.label}">Label</th><td th:text="${row.value}">Value</td></tr>
+    </table>
+    <div th:each="t : ${s.tables}">
+      <h3 th:if="${t.caption != null}" th:text="${t.caption}">Caption</h3>
+      <table class="grid">
+        <thead><tr><th th:each="h : ${t.headers}" th:text="${h}">Header</th></tr></thead>
+        <tbody>
+          <tr th:each="row : ${t.rows}"><td th:each="cell : ${row}" th:text="${cell}">Cell</td></tr>
+          <tr th:if="${t.rows.isEmpty()}"><td class="muted" th:attr="colspan=${t.headers.size()}">None entered.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note" th:if="${s.note != null}" th:text="${s.note}">Note</div>
+  </div>
+
+  <div th:each="d : ${diagrams}" class="diagram">
+    <h2 th:text="${d.title}">Diagram</h2>
+    <img th:if="${d.dataUri != null}" th:src="${d.dataUri}" alt=""/>
+    <div class="note" th:if="${d.dataUri == null}" th:text="${'See the attached job document: ' + d.fileName}">Document</div>
+  </div>
+
+  <div class="annex-start" th:if="${!j.annex.isEmpty()}">
+    <h1>Annex</h1>
+    <div class="muted" th:text="${'Wording version ' + j.annexVersion}">Version</div>
+    <div th:each="a : ${j.annex}">
+      <h2 th:text="${a.title}">Title</h2>
+      <div class="annex" th:text="${a.body}">Body</div>
+    </div>
+  </div>
+</body>
+</html>

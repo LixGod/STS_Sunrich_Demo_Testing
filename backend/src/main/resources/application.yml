@@ -1,0 +1,102 @@
+spring:
+  application:
+    name: ship2ship
+  profiles:
+    default: prod
+  datasource:
+    # All timestamps are persisted in UTC (SRS DR-04).
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ship2ship}?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useUnicode=true&characterEncoding=utf8
+    username: ${DB_USER:ship2ship}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+          preferred_uuid_jdbc_type: BINARY
+        order_inserts: true
+        order_updates: true
+  flyway:
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      # Uploads stream to a temporary file; the file service enforces the per-file limit and allowed types.
+      max-file-size: ${FILES_MAX_SIZE:25MB}
+      max-request-size: ${FILES_MAX_REQUEST:26MB}
+  mvc:
+    problemdetails:
+      enabled: true
+  # Null fields are sent as null (not omitted): the frontend types declare them as "value | null".
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/xml,text/plain,application/javascript,text/css
+    min-response-size: 1024
+  error:
+    include-stacktrace: never
+    include-message: never
+  servlet:
+    session:
+      timeout: ${SESSION_TIMEOUT:30m}
+      cookie:
+        name: STS_OPS_AUTH
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: strict
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+ship2ship:
+  company:
+    # Printed on quotations, invoices and the FDA; the base currency converts job costs; the time zone sets the numbering year.
+    name: ${COMPANY_NAME:Ship-2-Ship}
+    billing-address: ${COMPANY_BILLING_ADDRESS:}
+    tax-registration-no: ${COMPANY_TAX_REGISTRATION_NO:}
+    base-currency: ${COMPANY_BASE_CURRENCY:USD}
+    timezone: ${COMPANY_TIMEZONE:Asia/Kolkata}
+  files:
+    # Local-disk store until the FTP server is available (K7). Use an encrypted volume.
+    root: ${FILES_ROOT:./data/files}
+    max-bytes: ${FILES_MAX_BYTES:26214400}
+    token-minutes: 5
+  paging:
+    default-size: 25
+    max-size: 100
+  bootstrap:
+    # External-auth subject of the first Admin (created once if no Admin exists).
+    admin-subject-id: ${BOOTSTRAP_ADMIN_SUBJECT:}
+    admin-full-name: ${BOOTSTRAP_ADMIN_NAME:}
+    admin-email: ${BOOTSTRAP_ADMIN_EMAIL:}
+  open-meteo:
+    api-key: ${OPEN_METEO_API_KEY:}

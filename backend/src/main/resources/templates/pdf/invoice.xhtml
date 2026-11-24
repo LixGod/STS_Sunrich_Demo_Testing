@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title th:text="${d.title + ' ' + d.number}">Invoice</title>
+  <style>
+    @page { size: A4 landscape; margin: 14mm 14mm 16mm 14mm;
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: sans-serif; font-size: 8pt; color: #666; } }
+    body { font-family: sans-serif; font-size: 9pt; color: #1f2933; }
+    .draft { position: fixed; top: 110mm; left: 10mm; width: 160mm; text-align: center; font-size: 72pt; font-weight: bold;
+      color: #d9d9d9; transform: rotate(-30deg); z-index: -1; }
+  </style>
+  <style th:replace="~{bill-summary :: styles}"></style>
+</head>
+<body>
+  <div class="draft" th:if="${d.draft}">DRAFT</div>
+  <div th:replace="~{bill-summary :: summary}"></div>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title th:text="${'Proforma Invoice ' + q.reference}">Proforma Invoice</title>
+  <style>
+    @page { size: A4; margin: 13mm 13mm 19mm 13mm;
+      @bottom-right { content: "Page " counter(page) " of " counter(pages); color: #e9c47c; font: bold 7pt sans-serif; }
+    }
+    body { margin: 0; font: 8.4pt Arial, sans-serif; color: #233044; }
+    .page { page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+    .brand { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+    .brand td { vertical-align: middle; }
+    .logo { width: 30mm; height: auto; }
+    .brand-name { color: #a52138; font: bold 15pt Georgia, serif; letter-spacing: 1px; }
+    .tagline { color: #647083; font-size: 7.5pt; margin-top: 1mm; }
+    .title { text-align: right; color: #203d62; font: bold 18pt Arial, sans-serif; letter-spacing: 2px; }
+    .bar { width: 100%; border-collapse: collapse; background: #203d62; color: white; border-top: 2pt solid #aa243b; margin: 0 0 5mm; }
+    .bar td { padding: 3mm 3mm; width: 25%; vertical-align: top; font-weight: bold; }
+    .eyebrow { display: block; font-size: 7pt; color: #e9c47c; letter-spacing: 1px; margin-bottom: 1mm; }
+    .cards, .terms-grid, .bank-grid, .accept-grid { width: 100%; border-collapse: separate; border-spacing: 3mm 0; margin-left: -3mm; }
+    .cards > tr > td { width: 50%; vertical-align: top; padding: 3mm 4mm; background: #f7ebed; border-top: 2pt solid #a52138; }
+    .cards > tr > td + td { background: #e9eff5; border-top-color: #203d62; }
+    .card-label { color: #a52138; font-weight: bold; font-size: 7.5pt; letter-spacing: 1px; margin-bottom: 2mm; }
+    .cards > tr > td + td .card-label { color: #203d62; }
+    .client-name { font-size: 10pt; font-weight: bold; margin-bottom: 1mm; }
+    .muted { color: #647083; }
+    .details { width: 100%; border-collapse: collapse; }
+    .details td { padding: 0.7mm 0; }
+    .details td:first-child { width: 26%; color: #647083; }
+    .price { width: 100%; border-collapse: collapse; margin-top: 5mm; }
+    .price th { background: #203d62; color: white; text-align: left; padding: 2.5mm 2mm; }
+    .price td { padding: 2.5mm 2mm; border-bottom: 0.4pt solid #d9dee5; vertical-align: top; }
+    .price tbody tr:nth-child(even) { background: #f9f2e8; }
+    .price .num { text-align: right; white-space: nowrap; }
+    .price .description { width: 37%; }
+    .price .description strong { display: block; }
+    .price .inr { background: #fdfaf3; }
+    .price.dual .description { width: 29%; }
+    .price.dual th, .price.dual td { padding: 2.2mm 1.5mm; font-size: 7.8pt; }
+    .money-row { width: 100%; border-collapse: collapse; margin-top: 4mm; }
+    .money-row td { width: 50%; vertical-align: top; }
+    .money-row td + td { padding-left: 5mm; }
+    .words { font-size: 8pt; font-weight: bold; margin: 1mm 0 3mm; }
+    .advance { display: inline-block; background: #a52138; color: white; font-weight: bold; padding: 2mm; }
+    .totals { width: 100%; border-collapse: collapse; }
+    .totals td { padding: 1mm; }
+    .totals td + td { text-align: right; }
+    .totals .payable { color: white; background: #a52138; font-weight: bold; font-size: 10pt; }
+    .totals.dual td { font-size: 8pt; }
+    .totals.dual .payable { font-size: 8.6pt; }
+    h2 { font: bold 12pt Georgia, serif; color: #203d62; border-bottom: 1.5pt solid #d7a754; padding-bottom: 1.4mm; margin: 6mm 0 2mm; }
+    h3 { color: #203d62; font-size: 9pt; margin: 0 0 1mm; }
+    .scope-head { width: 100%; border-collapse: collapse; border-bottom: 1.5pt solid #d7a754; margin: 6mm 0 2.5mm; }
+    .scope-head td { padding-bottom: 1.4mm; vertical-align: baseline; }
+    .scope-head .title-cell { font: bold 12pt Georgia, serif; color: #203d62; }
+    .scope-head .sub-cell { text-align: right; color: #647083; font-size: 7.5pt; }
+    .scope { width: 100%; border-collapse: collapse; }
+    .scope td { width: 50%; vertical-align: top; padding: 1mm 3mm 1.5mm 0; }
+    .scope .badge { display: inline-block; width: 4.5mm; height: 4.5mm; line-height: 4.5mm; text-align: center; background: #f7ebed; color: #a52138; font-weight: bold; font-size: 7.5pt; border-radius: 50%; margin-right: 1.5mm; }
+    .scope-title { font-weight: bold; }
+    .scope .muted.small { margin-left: 6mm; margin-top: 0.4mm; white-space: pre-line; }
+    .small { font-size: 7.5pt; }
+    .footer { position: fixed; bottom: 0; left: 0; right: 0; height: 12mm; background: #203d62;
+      border-top: 1.5pt solid #a52138; color: white; font-size: 6.7pt; padding: 1.5mm 3mm; line-height: 1.45; }
+    .continued { width: 100%; border-collapse: collapse; margin-bottom: 6mm; border-bottom: 1.5pt solid #a52138; }
+    .continued td { vertical-align: middle; padding-bottom: 2mm; }
+    .continued .right { text-align: right; color: #203d62; font-weight: bold; }
+    .terms-grid td { width: 50%; vertical-align: top; padding: 3mm; background: #edf2f6; border-top: 2pt solid #203d62; }
+    .terms-grid tr + tr td { padding-top: 4mm; }
+    .terms-grid p { margin: 1mm 0 2mm; line-height: 1.35; }
+    .bank-grid td { vertical-align: top; width: 33%; padding: 2.5mm; background: #f8f4ed; border-top: 1.5pt solid #d7a754; line-height: 1.45; }
+    .bank-grid h3 { margin-bottom: 2mm; }
+    .accept-grid { margin-top: 7mm; }
+    .accept-grid td { width: 50%; vertical-align: top; padding: 2mm 3mm; border-top: 1pt solid #b9c4d0; }
+    .signature { height: 10mm; }
+    .legal { width: 100%; border-collapse: collapse; }
+    .legal td { vertical-align: top; padding: 1.4mm 2mm 1.4mm 0; line-height: 1.35; }
+    .legal .n { width: 5mm; color: #a52138; font-weight: bold; }
+    .legal strong { display: block; margin-bottom: 0.5mm; color: #203d62; }
+    .legal-note { background: #f8f4ed; padding: 3mm; margin-top: 3mm; }
+    .pre { white-space: pre-wrap; }
+    .draft { position: fixed; top: 115mm; left: 8mm; font: bold 68pt Arial, sans-serif; color: #d9d9d9;
+      transform: rotate(-30deg); opacity: 0.35; z-index: -1; }
+  </style>
+</head>
+<body>
+  <div class="draft" th:if="${q.draft}">DRAFT</div>
+  <div class="footer">
+    Ashford Centre, 5th Floor, Opp. Peninsula Corporate Park, S. N. Marg, Lower Parel, Mumbai 400 013<br/>
+    Tel +91 22 6667 7300 · Fax +91 22 6667 7370 · ops@ship2ship.co.in<br/>
+    Regd. Office: 124-B, Mittal Court, 224 Nariman Point, Mumbai 400 021, India
+  </div>
+
+  <div class="page">
+    <table class="brand"><tr>
+      <td style="width:32mm"><img class="logo" th:src="${logo}" alt="Ship2Ship"/></td>
+      <td><div class="brand-name">SHIP2SHIP PRIVATE LIMITED</div><div class="tagline">Ship-to-Ship Transfer Services · Mumbai, India</div>
+        <div class="tagline" th:if="${q.taxRegistrationNo != null}" th:text="${'GSTIN: ' + q.taxRegistrationNo}">GSTIN</div></td>
+      <td class="title">PROFORMA<br/>INVOICE</td>
+    </tr></table>
+    <table class="bar"><tr>
+      <td><span class="eyebrow">REFERENCE NO.</span><span th:text="${q.reference}">Reference</span></td>
+      <td><span class="eyebrow">DATE OF ISSUE</span><span th:text="${q.date}">Date</span></td>
+      <td><span class="eyebrow">VALID FOR</span><span th:text="${q.validFor}">Validity</span></td>
+      <td><span class="eyebrow">CURRENCY</span><span th:text="${q.currency + (q.inr != null ? ' / INR' : '')}">USD</span></td>
+    </tr></table>
+    <table class="cards"><tr>
+      <td><div class="card-label">BILL TO</div><div class="client-name" th:text="${q.clientName}">Client</div>
+        <div class="muted" th:if="${q.clientAddress != null}" th:text="${q.clientAddress}">Address</div>
+        <div class="muted" th:if="${q.contactName != null}" th:text="${'Attn: ' + q.contactName}">Contact</div></td>
+      <td><div class="card-label">OPERATION DETAILS</div><table class="details">
+        <tr><td>Operation</td><td>Ship-to-Ship (STS) transfer</td></tr>
+        <tr th:if="${q.operationType != null}"><td>Cargo types</td><td th:text="${q.operationType}">Cargo types</td></tr>
+        <tr th:if="${!q.vessels.isEmpty()}"><td>Vessels</td><td th:text="${#strings.listJoin(q.vessels, ' / ')}">Vessels</td></tr>
+        <tr th:if="${q.extraHoursNotice != null and q.extraHoursNotice.baseHours != null}"><td>Basis</td><td th:text="${q.extraHoursNotice.baseHours + ' hrs operation'}">48 hrs operation</td></tr>
+        <tr th:if="${(q.extraHoursNotice == null or q.extraHoursNotice.baseHours == null) and q.tariff != null}"><td>Basis</td><td th:text="${q.tariff.baseHours + ' hrs operation'}">48 hrs operation</td></tr>
+        <tr th:if="${!q.cargo.isEmpty()}"><td>Cargo</td><td th:text="${#strings.listJoin(q.cargo, ' / ')}">Cargo</td></tr>
+      </table></td>
+    </tr></table>
+    <table class="price" th:classappend="${q.inr != null ? ' dual' : ''}"><thead><tr>
+      <th>#</th><th class="description">Description</th><th>SAC</th>
+      <th class="num" th:text="${q.inr != null ? 'Amount (' + q.currency + ')' : 'Amount'}">Amount</th>
+      <th class="num" th:if="${q.inr != null}">Amount (INR)</th>
+      <th class="num">GST</th>
+      <th class="num" th:text="${'Total (' + q.currency + ')'}">Total</th>
+      <th class="num" th:if="${q.inr != null}">Total (INR)</th>
+    </tr></thead><tbody>
+      <tr th:each="l : ${q.lines}"><td th:text="${l.no}">1</td>
+        <td class="description"><strong th:text="${l.description}">Service</strong><span class="muted small" th:text="${l.quantity + ' × ' + q.currency + ' ' + l.unitPrice + (l.inrUnitPrice != null ? ' / INR ' + l.inrUnitPrice : '')}">Quantity</span></td>
+        <td class="muted">—</td><td class="num" th:text="${l.amount}">0.00</td>
+        <td class="num inr" th:if="${q.inr != null}" th:text="${l.inrAmount}">0.00</td>
+        <td class="num">18%</td><td class="num" th:text="${l.totalWithGst}">0.00</td>
+        <td class="num inr" th:if="${q.inr != null}" th:text="${l.inrTotalWithGst}">0.00</td></tr>
+      <tr th:if="${q.extraHoursNotice != null and !q.hasPrebilledExtraHours}"><td th:text="${q.lines.size() + 1}">2</td>
+        <td class="description"><strong th:text="${q.extraHoursNotice.baseHours != null ? 'Additional hours beyond ' + q.extraHoursNotice.baseHours + ' hrs (if applicable)' : 'Additional hours (if applicable)'}">Additional hours</strong>
+          <span class="muted small" th:text="${q.extraHoursNotice.baseHours != null ? (q.extraHoursNotice.rate != null ? 'Additional hours will be charged at ' + q.currency + ' ' + q.extraHoursNotice.rate + (q.extraHoursNotice.inrRate != null ? ' / INR ' + q.extraHoursNotice.inrRate : '') + ' / hr if the operation exceeds ' + q.extraHoursNotice.baseHours + ' hrs.' : 'Additional hours will be charged at actuals if the operation exceeds ' + q.extraHoursNotice.baseHours + ' hrs.') : (q.extraHoursNotice.rate != null ? 'Additional hours will be charged at ' + q.currency + ' ' + q.extraHoursNotice.rate + (q.extraHoursNotice.inrRate != null ? ' / INR ' + q.extraHoursNotice.inrRate : '') + ' / hr if the operation exceeds the agreed base hours.' : 'Charged at actuals after completion.')}">Charged at actuals after completion.</span></td>
+        <td class="muted">—</td><td class="num" th:text="${q.extraHoursNotice.rate != null ? q.extraHoursNotice.rate + ' / hr' : 'At actuals'}">Rate</td>
+        <td class="num inr" th:if="${q.inr != null}" th:text="${q.extraHoursNotice.inrRate != null ? q.extraHoursNotice.inrRate + ' / hr' : 'At actuals'}">Rate</td>
+        <td class="num">18%</td><td class="num muted">At actuals</td>
+        <td class="num muted inr" th:if="${q.inr != null}">At actuals</td></tr>
+    </tbody></table>
+    <table class="money-row"><tr><td><span class="eyebrow muted">AMOUNT IN WORDS</span>
+      <div class="words" th:text="${q.amountInWords}">Amount in words</div>
+      <div class="words" th:if="${q.inr != null}" th:text="${'/ ' + q.inr.amountInWords}">INR Amount in words</div>
+      <span class="advance" th:text="${q.paymentTerms != null ? 'PAYMENT TERMS' : '100% ADVANCE'}">100% ADVANCE</span>
+      <div class="muted small" th:text="${q.paymentTerms != null ? q.paymentTerms : 'Payment required before arrangements begin.'}">Payment terms</div>
+      <div class="muted small" th:if="${q.advanceReceived != null}" th:text="${'Planned client advance: ' + q.currency + ' ' + q.advanceReceived + (q.inr != null and q.inr.advanceReceived != null ? ' / INR ' + q.inr.advanceReceived : '')}">Advance</div>
+      <div class="muted small" th:if="${q.fxNote != null}" th:text="${q.fxNote}">FX rate</div>
+    </td><td><table class="totals" th:classappend="${q.inr != null ? ' dual' : ''}">
+      <tr><td>Sub-total</td><td th:text="${q.total + (q.inr != null ? ' / INR ' + q.inr.total : '')}">0.00</td></tr>
+      <tr><td>GST @ 18%</td><td th:text="${q.gst + (q.inr != null ? ' / INR ' + q.inr.gst : '')}">0.00</td></tr>
+      <tr class="payable"><td>TOTAL PAYABLE</td><td th:text="${q.currency + ' ' + q.grandTotal + (q.inr != null ? ' / INR ' + q.inr.grandTotal : '')}">Total</td></tr>
+      <tr th:if="${q.advancePaid != null}"><td>Advance Paid</td><td th:text="${q.currency + ' ' + q.advancePaid + (q.inr != null and q.inr.advancePaid != null ? ' / INR ' + q.inr.advancePaid : '')}">0.00</td></tr>
+      <tr th:if="${q.balancePayable != null}"><td><strong>Balance Payable</strong></td><td><strong th:text="${q.currency + ' ' + q.balancePayable + (q.inr != null and q.inr.balancePayable != null ? ' / INR ' + q.inr.balancePayable : '')}">0.00</strong></td></tr>
+    </table></td></tr></table>
+    <div th:if="${!q.scopeOfServices.isEmpty()}">
+      <table class="scope-head"><tr><td class="title-cell">Scope of Services Included</td><td class="sub-cell">STS cost inclusions</td></tr></table>
+      <table class="scope"><tr th:each="item, s : ${q.scopeOfServices}" th:if="${s.index % 2 == 0}">
+        <td><span class="badge" th:text="${item.no}">1</span><span class="scope-title" th:text="${item.title}">Service</span>
+          <div class="muted small" th:if="${item.detail != null}" th:text="${item.detail}">Detail</div></td>
+        <td th:if="${s.index + 1 &lt; q.scopeOfServices.size()}">
+          <span class="badge" th:text="${q.scopeOfServices[s.index + 1].no}">2</span>
+          <span class="scope-title" th:text="${q.scopeOfServices[s.index + 1].title}">Service</span>
+          <div class="muted small" th:if="${q.scopeOfServices[s.index + 1].detail != null}" th:text="${q.scopeOfServices[s.index + 1].detail}">Detail</div>
+        </td><td th:unless="${s.index + 1 &lt; q.scopeOfServices.size()}"></td>
+      </tr></table>
+    </div>
+  </div>
+
+  <div class="page">
+    <table class="continued"><tr><td class="brand-name">SHIP2SHIP PRIVATE LIMITED</td>
+      <td class="right" th:text="${'Proforma Invoice · ' + q.reference + ' · ' + q.date}">Reference</td></tr></table>
+    <h2>Commercial Terms</h2>
+    <table class="terms-grid"><tr>
+      <td><h3>PAYMENT &amp; VALIDITY</h3><p th:text="${q.paymentTerms != null ? q.paymentTerms : '100% advance payment is required to make the necessary arrangements.'}">Payment</p>
+        <p th:text="${'This quotation is valid until ' + q.validUntil + ' (' + q.validFor + ' from issue).'}">Validity</p></td>
+      <td><h3>NOTICE &amp; APPROVALS</h3><p>7 working days' advance notice is required.</p>
+        <p>Arrangements are subject to Customs / Port permission and weather conditions.</p></td>
+    </tr><tr>
+      <td><h3>OPERATION TIME</h3><p th:if="${q.extraHoursNotice != null}" th:text="${(q.extraHoursNotice.baseHours != null ? 'Cost is based on ' + q.extraHoursNotice.baseHours + ' hrs. Additional hours beyond ' + q.extraHoursNotice.baseHours + ' hrs will be charged' : 'Additional hours will be charged') + (q.extraHoursNotice.rate != null ? ' at ' + q.currency + ' ' + q.extraHoursNotice.rate + (q.extraHoursNotice.inrRate != null ? ' / INR ' + q.extraHoursNotice.inrRate : '') + ' per hour + 18% GST.' : ' at actuals + 18% GST.')}">Charging basis</p>
+        <p th:if="${q.extraHoursNotice == null and q.tariff != null}" th:text="${'Cost is based on ' + q.tariff.baseHours + ' hrs. Beyond that: ' + q.currency + ' ' + q.tariff.extraHourRate + ' per hour + 18% GST.'}">Charging basis</p>
+        <p>Time runs from the tug leaving shore for fendering until it returns after de-fendering, including stoppages for bad weather.</p></td>
+      <td><h3>CANCELLATION</h3><p>100% charge once mobilisation has started.</p><p>50% charge if cancelled within 48 hours before the STS operation.</p></td>
+    </tr></table>
+    <p class="muted">Any additional expenses incurred will be advised as soon as they are known.</p>
+    <h2>Remittance Details</h2><p>Purpose of remittance: <strong>Ship Disbursement</strong></p>
+    <table class="bank-grid"><tr>
+      <td><h3>BENEFICIARY</h3>Ship2Ship Pvt Ltd<br/>124-B, Mittal Court, 224 Nariman Point, Mumbai 400 021<br/>Tel +91 22 6145 5252<br/><br/><strong>Account No.</strong><br/>015020110000387</td>
+      <td><h3>BENEFICIARY BANK</h3>Bank of India<br/>Overseas Branch, M.G. Road, Hutatma Chowk, Mumbai 400 023, India<br/><br/><strong>SWIFT</strong> BKIDINBBBOS<br/><strong>IFSC</strong> BKID0000150</td>
+      <td><h3>INTERMEDIARY BANK</h3>Bank of India, New York<br/>New York, U.S.A.<br/><br/><strong>SWIFT</strong> BKIDUS33<br/><strong>ABA</strong> 026005458<br/><strong>A/C</strong> 544774311</td>
+    </tr></table>
+    <p class="small" th:text="${'Please quote the reference number ' + q.reference + ' with your remittance and email the payment advice to ops@ship2ship.co.in.'}">Remittance advice</p>
+    <h2>Acceptance</h2>
+    <table class="accept-grid"><tr>
+      <td>For and on behalf of<br/><strong>Ship2Ship Private Limited</strong><div class="signature"></div>Authorised Signatory · Name / Date</td>
+      <td>Accepted by the Client<br/><strong th:text="${q.clientName}">Client</strong><div class="signature"></div>Signature &amp; Company Stamp · Name / Date</td>
+    </tr></table>
+    <p th:if="${q.advanceGiven != null}" th:text="${'Planned supplier advance: ' + q.currency + ' ' + q.advanceGiven}">Supplier advance</p>
+  </div>
+
+  <div class="page">
+    <table class="continued"><tr><td class="brand-name">SHIP2SHIP PRIVATE LIMITED</td>
+      <td class="right" th:text="${'Proforma Invoice · ' + q.reference + ' · ' + q.date}">Reference</td></tr></table>
+    <h2>Terms and Conditions</h2><h3>INDEMNITY &amp; LIMITATION OF LIABILITY</h3>
+    <table class="legal">
+      <tr><td class="n">1.</td><td><strong>No Liability for Incidents</strong>Ship2Ship Private Limited, including its directors, officers, employees, agents, subcontractors and representatives, shall not be liable for any accident, incident or occurrence of whatsoever nature, including but not limited to personal injury, loss of life, damage to vessel(s), cargo, equipment, property or the environment, arising during or in connection with the Ship-to-Ship (STS) operation.</td></tr>
+      <tr><td class="n">2.</td><td><strong>Vessel Owners' &amp; Charterers' Responsibility</strong>The full and sole responsibility for the safety, seaworthiness, manning and proper conduct of the vessels, their crew, cargo and equipment rests exclusively with the respective vessel owners, charterers, managers and/or their appointed representatives.</td></tr>
+      <tr><td class="n">3.</td><td><strong>Environmental &amp; Pollution Risks</strong>Any liability, claim, fine, penalty or expense arising from oil pollution, cargo spillage, leakage, fire, explosion or any environmental damage during the STS operation shall remain entirely with the vessel owners/charterers. Ship2Ship Private Limited shall not be responsible under any circumstances.</td></tr>
+      <tr><td class="n">4.</td><td><strong>Cargo &amp; Commercial Risks</strong>Ship2Ship Private Limited shall not be held responsible for any cargo loss, shortage, contamination, delay, off-specification cargo, or any commercial/financial consequences arising therefrom.</td></tr>
+      <tr><td class="n">5.</td><td><strong>Damage to Equipment (Fenders, Hoses, etc.)</strong>Any damage, loss or destruction of Ship2Ship Private Limited's equipment — including but not limited to fenders, hoses, mooring gear or any other STS support equipment — occurring during the operation, whether due to vessel movement, improper handling or any other reason, shall be borne in full by the respective vessel owners and/or charterers. The Client undertakes to reimburse Ship2Ship Private Limited for all such repair or replacement costs without delay.</td></tr>
+      <tr><td class="n">6.</td><td><strong>Third-Party Claims</strong>The Client agrees to indemnify, defend and hold harmless Ship2Ship Private Limited against all claims, demands, suits, actions, damages, liabilities, losses, costs and expenses (including legal and defence costs) brought by any third party in relation to the STS operation.</td></tr>
+      <tr><td class="n">7.</td><td><strong>Force Majeure &amp; Operational Delays</strong>Ship2Ship Private Limited shall not be liable for any delay, cancellation or failure to perform the STS operation due to reasons beyond its control, including but not limited to weather conditions, sea state, equipment breakdown, government restrictions or port authority instructions.</td></tr>
+      <tr><td class="n">8.</td><td><strong>Indemnity by Client</strong>The Client, on behalf of the vessel owners/charterers/operators, expressly undertakes to indemnify and hold Ship2Ship Private Limited harmless from and against any and all liabilities, claims, losses, damages, fines, penalties and expenses of whatever nature, regardless of cause, including negligence, arising out of or in connection with the STS operation.</td></tr>
+      <tr><td class="n">9.</td><td><strong>Survival of Clause</strong>This indemnity and limitation of liability provision shall remain valid and enforceable notwithstanding the completion of the STS operation, termination of services or expiry of any related agreement.</td></tr>
+    </table>
+    <p class="legal-note">Confirmation of this proforma invoice and/or remittance of the advance payment constitutes acceptance of the commercial terms and the terms and conditions set out above.</p>
+    <div th:if="${q.termsText != null}"><h2>Additional Quotation Conditions</h2><p class="pre" th:text="${q.termsText}">Additional terms</p></div>
+  </div>
+</body>
+</html>

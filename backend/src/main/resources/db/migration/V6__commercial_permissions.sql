@@ -1,0 +1,40 @@
+-- Phase 2a permissions and their baseline role mapping (to be confirmed by Ship2Ship, SRS §27).
+
+INSERT INTO permission (code, module, description) VALUES
+    ('COMMERCIAL.ENQUIRY.READ',  'COMMERCIAL', 'View enquiries within scope'),
+    ('COMMERCIAL.ENQUIRY.WRITE', 'COMMERCIAL', 'Register and update enquiries within scope'),
+    ('MASTER.COMMERCIAL.READ',   'MASTERS',    'View clients, vessels, cargo grades and units'),
+    ('MASTER.COMMERCIAL.WRITE',  'MASTERS',    'Manage clients, vessels, cargo grades and units'),
+    ('MASTER.FINANCE.READ',      'MASTERS',    'View currencies, exchange rates, tax codes, cost heads and tariffs'),
+    ('MASTER.FINANCE.WRITE',     'MASTERS',    'Manage currencies, exchange rates, tax codes, cost heads and tariffs');
+
+-- System Administrator keeps every permission.
+INSERT INTO role_permission (role_id, permission_code)
+SELECT r.id, p.code FROM role r
+JOIN permission p ON p.code IN ('COMMERCIAL.ENQUIRY.READ', 'COMMERCIAL.ENQUIRY.WRITE', 'MASTER.COMMERCIAL.READ',
+                                'MASTER.COMMERCIAL.WRITE', 'MASTER.FINANCE.READ', 'MASTER.FINANCE.WRITE')
+WHERE r.code = 'SYSTEM_ADMIN';
+
+INSERT INTO role_permission (role_id, permission_code)
+SELECT r.id, x.code FROM role r JOIN (
+    SELECT 'COMMERCIAL' AS role_code, 'COMMERCIAL.ENQUIRY.READ' AS code UNION ALL
+    SELECT 'COMMERCIAL', 'COMMERCIAL.ENQUIRY.WRITE' UNION ALL
+    SELECT 'COMMERCIAL', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'COMMERCIAL', 'MASTER.COMMERCIAL.WRITE' UNION ALL
+    SELECT 'COMMERCIAL', 'MASTER.FINANCE.READ' UNION ALL
+    SELECT 'MANAGEMENT_APPROVER', 'COMMERCIAL.ENQUIRY.READ' UNION ALL
+    SELECT 'MANAGEMENT_APPROVER', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'MANAGEMENT_APPROVER', 'MASTER.FINANCE.READ' UNION ALL
+    SELECT 'OPERATIONS', 'COMMERCIAL.ENQUIRY.READ' UNION ALL
+    SELECT 'OPERATIONS', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'TECHNICAL', 'COMMERCIAL.ENQUIRY.READ' UNION ALL
+    SELECT 'TECHNICAL', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'HSE_REVIEWER', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'FINANCE', 'COMMERCIAL.ENQUIRY.READ' UNION ALL
+    SELECT 'FINANCE', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'FINANCE', 'MASTER.FINANCE.READ' UNION ALL
+    SELECT 'FINANCE', 'MASTER.FINANCE.WRITE' UNION ALL
+    SELECT 'AUDITOR', 'COMMERCIAL.ENQUIRY.READ' UNION ALL
+    SELECT 'AUDITOR', 'MASTER.COMMERCIAL.READ' UNION ALL
+    SELECT 'AUDITOR', 'MASTER.FINANCE.READ'
+) x ON x.role_code = r.code;

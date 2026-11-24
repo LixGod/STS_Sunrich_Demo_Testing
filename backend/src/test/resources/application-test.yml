@@ -1,0 +1,53 @@
+# Automated tests: MySQL 8.4 from Testcontainers, synthetic seed data and the login stub.
+spring:
+  datasource:
+    hikari:
+      data-source-properties:
+        queryInterceptors: com.ship2ship.support.StatementCounter
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev-seed
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+ship2ship:
+  alerts:
+    enabled: false
+  files:
+    root: ${java.io.tmpdir}/ship2ship-test-files
+    max-bytes: 1048576
+  dev-auth:
+    users:
+      - username: admin
+        password: admin
+        subject-id: dev-admin
+      - username: sts.admin
+        password: sts
+        subject-id: dev-sts-admin
+      - username: ops.mumbai
+        password: ops
+        subject-id: dev-ops-mumbai
+      - username: commercial
+        password: commercial
+        subject-id: dev-commercial
+      - username: finance
+        password: finance
+        subject-id: dev-finance
+      - username: approver
+        password: approver
+        subject-id: dev-approver
+      - username: technical
+        password: technical
+        subject-id: dev-technical
+      - username: marine
+        password: marine
+        subject-id: dev-marine
+      - username: ops.manager
+        password: ops
+        subject-id: dev-ops-manager
+      - username: stranger
+        password: stranger
+        subject-id: dev-not-provisioned

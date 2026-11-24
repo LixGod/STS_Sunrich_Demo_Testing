@@ -1,0 +1,1 @@
+ALTER TABLE estimate ADD COLUMN inr_fx_rate DECIMAL(19,8) NULL;

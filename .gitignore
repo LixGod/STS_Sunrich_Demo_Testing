@@ -1,0 +1,19 @@
+# Secrets and local environment
+.env
+*.env.local
+infrastructure/docker/.env
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local runtime state and session files
+/cookie.txt
+/tmp/
+/backend/data/
+/output/

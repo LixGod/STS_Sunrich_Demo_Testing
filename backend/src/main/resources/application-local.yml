@@ -1,0 +1,62 @@
+# Local development only. Synthetic demo data (SRS D14) and the development login stub.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3307/ship2ship?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useUnicode=true&characterEncoding=utf8}
+    password: ${DB_PASSWORD:ship2ship-local}
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev-seed
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+# Local measurement only: /actuator/metrics (signed-in users) with request latency percentiles, JVM, CPU and Hikari pool.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  metrics:
+    distribution:
+      percentiles:
+        http.server.requests: 0.5,0.95
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+ship2ship:
+  dev-auth:
+    # Synthetic users for the local login stub. Never active outside the local/test profiles.
+    users:
+      - username: admin
+        password: admin
+        subject-id: dev-admin
+      - username: sts.admin
+        password: sts
+        subject-id: dev-sts-admin
+      - username: ops.mumbai
+        password: ops
+        subject-id: dev-ops-mumbai
+      - username: commercial
+        password: commercial
+        subject-id: dev-commercial
+      - username: finance
+        password: finance
+        subject-id: dev-finance
+      - username: approver
+        password: approver
+        subject-id: dev-approver
+      - username: technical
+        password: technical
+        subject-id: dev-technical
+      - username: marine
+        password: marine
+        subject-id: dev-marine
+      - username: ops.manager
+        password: ops
+        subject-id: dev-ops-manager
