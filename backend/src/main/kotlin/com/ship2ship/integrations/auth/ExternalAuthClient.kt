@@ -38,7 +38,7 @@ interface ExternalAuthClient {
 
 /** Active outside local/test until the real adapter exists: refuses every login with a clear error. */
 @Component
-@Profile("!local & !test")
+@Profile("!local & !test & !demo")
 class UnconfiguredExternalAuthClient : ExternalAuthClient {
 
     init {
@@ -47,6 +47,26 @@ class UnconfiguredExternalAuthClient : ExternalAuthClient {
 
     override fun authenticate(username: String, password: String): ExternalIdentity? =
         throw ExternalAuthUnavailableException("The authentication provider is not configured.")
+}
+
+/** Railway demo sign-in uses only active accounts with a stored BCrypt credential. */
+@Component
+@Profile("demo & !local & !test")
+class DemoDatabaseAuthClient(private val jdbc: JdbcClient) : ExternalAuthClient {
+    private val encoder = BCryptPasswordEncoder()
+
+    override fun authenticate(username: String, password: String): ExternalIdentity? {
+        val hash = jdbc.sql("""
+            SELECT c.password_hash FROM user_local_credential c
+            JOIN app_user u ON u.id = c.user_id
+            WHERE u.external_subject_id = :username AND u.status = 'ACTIVE'
+        """).param("username", username).query(String::class.java).optional().orElse(null) ?: return null
+        return if (encoder.matches(password, hash)) ExternalIdentity(subjectId = username) else null
+    }
+
+    override fun prepareUsernameChange(userId: java.util.UUID, oldSubject: String, newSubject: String) {
+        // The credential is linked to the user ID, so changing the username needs no credential update.
+    }
 }
 
 @ConfigurationProperties("ship2ship.dev-auth")
