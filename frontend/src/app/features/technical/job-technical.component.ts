@@ -8,12 +8,13 @@ import { AuthService } from '../../core/auth/auth.service';
 import { Permissions } from '../../core/auth/permissions';
 import { uploadProblem } from '../../core/files/upload-validation';
 import { LookupService, LookupOption } from '../../core/lookups/lookup.service';
-import { Subject, forkJoin, takeUntil } from 'rxjs';
+import { Subject, catchError, concatMap, filter, forkJoin, from, map, of, take, takeUntil } from 'rxjs';
 import { DocumentViewerComponent, ViewableFile } from '../../shared/components/document-viewer/document-viewer.component';
 import { JobDocument, JobRequest, JobTechnicalJob, JobTechnicalService, RequestItem,
   VoyageField, VoyageVersion, CompatibilityReview, EmailPreview, ChecklistResponse, ChecklistTemplate } from './job-technical.service';
 
 interface EditableValue { value: string; sourceDocumentId: string | null; sourcePage: number | null }
+interface PendingDocument { file: File; itemId: string | null; error: string | null }
 
 @Component({
   selector: 's2s-job-technical',
@@ -58,10 +59,15 @@ export class JobTechnicalComponent {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly pendingDocuments = signal<PendingDocument[]>([]);
+  protected readonly canImportDocuments = computed(() => this.pendingDocuments().length > 0 && this.pendingDocuments().every(row => !!row.itemId));
   protected readonly canWrite = computed(() => this.auth.hasPermission(Permissions.techJobWrite));
   protected readonly canReview = computed(() => this.auth.hasPermission(Permissions.techJobReview));
   protected readonly canManageTemplates = computed(() => this.auth.hasPermission(Permissions.masterTechnicalWrite));
   protected readonly activeItems = computed(() => (this.request()?.items ?? []).filter(item => item.status !== 'REMOVED'));
+  protected readonly documentTargets = computed(() => this.activeItems()
+    .filter(item => item.kind === 'DOCUMENT' || item.kind === 'CHECKLIST')
+    .map(item => ({ value: item.id, label: `${item.label} · ${this.vesselName(item.jobVesselId)}` })));
   protected readonly receivedCount = computed(() => this.activeItems().filter(item => this.received(item)).length);
 
   protected readonly phaseCounts = computed(() => {
@@ -145,6 +151,7 @@ export class JobTechnicalComponent {
       this.selectedChecklistVessel.set('');
       this.extraItem.update(item => ({ ...item, code: '', label: '', jobVesselId: '', documentTypeId: '', reason: '' }));
       this.viewing.set(null); this.busy.set(false); this.notice.set(null);
+      this.pendingDocuments.set([]);
     }
     this.error.set(null);
     this.api.job(id).pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -279,6 +286,91 @@ export class JobTechnicalComponent {
         this.error.set('Upload failed. Check the file type and size.');
         this.api.request(this.jobId()).pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe(x => this.request.set(x));
         input.value = '';
+      },
+    });
+  }
+
+  protected allowDocumentDrop(event: DragEvent): void { event.preventDefault(); }
+
+  protected dropDocuments(event: DragEvent): void {
+    event.preventDefault();
+    if (!this.canWrite() || this.busy()) return;
+    this.queueDocuments(Array.from(event.dataTransfer?.files ?? []));
+  }
+
+  protected chooseDocuments(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.queueDocuments(Array.from(input.files ?? []));
+    input.value = '';
+  }
+
+  private queueDocuments(files: File[]): void {
+    if (!files.length) {
+      this.error.set('Outlook did not provide the attachments. Try dragging the attached files, or choose them with the file picker.');
+      return;
+    }
+    const valid = files.filter(file => {
+      const problem = uploadProblem(file);
+      if (problem) this.error.set(this.translate.instant(problem));
+      return !problem;
+    });
+    if (!valid.length) return;
+    this.pendingDocuments.update(current => [...current, ...valid.map(file => ({
+      file, itemId: this.suggestDocumentTarget(file), error: null,
+    }))]);
+  }
+
+  private suggestDocumentTarget(file: File): string | null {
+    const name = file.name.toUpperCase();
+    const candidates = this.activeItems().filter(item => {
+      if (item.kind !== 'DOCUMENT' && item.kind !== 'CHECKLIST') return false;
+      const code = item.code.toUpperCase();
+      if (!code || !name.includes(code)) return false;
+      const vessel = this.job()?.vessels.find(row => row.id === item.jobVesselId);
+      return !vessel?.name || name.includes(vessel.name.toUpperCase());
+    });
+    return candidates.length === 1 ? candidates[0].id : null;
+  }
+
+  protected setDocumentTarget(index: number, itemId: string): void {
+    this.pendingDocuments.update(rows => rows.map((row, i) => i === index ? { ...row, itemId, error: null } : row));
+  }
+
+  protected removePendingDocument(index: number): void {
+    this.pendingDocuments.update(rows => rows.filter((_, i) => i !== index));
+  }
+
+  protected importDocuments(): void {
+    if (this.busy() || !this.pendingDocuments().length || this.pendingDocuments().some(row => !row.itemId)) return;
+    const jobId = this.jobId();
+    const rows = this.pendingDocuments();
+    let uploaded = 0;
+    this.busy.set(true); this.error.set(null);
+    from(rows).pipe(concatMap((row, index) => {
+      const item = this.activeItems().find(candidate => candidate.id === row.itemId);
+      if (!item) return of({ index, ok: false });
+      return this.api.upload(jobId, item, row.file).pipe(
+        filter(event => event.type === HttpEventType.Response), take(1),
+        map(() => ({ index, ok: true })), catchError(() => of({ index, ok: false })),
+      );
+    }), takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: result => {
+        if (result.ok) uploaded++;
+        else this.pendingDocuments.update(current => current.map((row, i) =>
+          i === result.index ? { ...row, error: 'Upload failed. Check this file and try again.' } : row));
+      },
+      complete: () => {
+        if (this.jobId() !== jobId) return;
+        this.busy.set(false);
+        this.pendingDocuments.update(current => current.filter(row => row.error));
+        if (uploaded) {
+          this.notice.set(`${uploaded} document${uploaded === 1 ? '' : 's'} uploaded and marked received.`);
+          forkJoin([this.api.request(jobId), this.api.documents(jobId), this.api.review(jobId)])
+            .pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: ([request, documents, review]) => {
+              this.request.set(request); this.documents.set(documents); this.review.set(review);
+            }, error: () => this.error.set('Documents uploaded. Reload to see the updated request.') });
+        }
       },
     });
   }

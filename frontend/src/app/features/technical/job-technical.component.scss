@@ -1,4 +1,9 @@
 :host{display:block;max-width:76rem;margin:0 auto}
+.bulk-documents{margin:1rem 0;padding:1rem;border:1px solid var(--s2s-border);border-radius:.6rem}
+.drop-zone{padding:1.25rem;border:2px dashed var(--s2s-border);border-radius:.5rem;text-align:center;background:var(--s2s-surface);p{margin:.4rem 0 .8rem}}
+.pick-files{display:inline-block;padding:.45rem .8rem;border:1px solid var(--s2s-border);border-radius:.35rem;cursor:pointer;font-weight:600;input{position:absolute;width:1px;height:1px;opacity:0}}
+.pick-files:focus-within{outline:2px solid var(--s2s-brand);outline-offset:2px}
+.pending-documents{margin-top:1rem;h3{margin:0 0 .7rem}.pending-document{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin:.5rem 0;padding:.6rem;border:1px solid var(--s2s-border);border-radius:.35rem}.pending-document>span:first-child{flex:1;min-width:12rem;overflow-wrap:anywhere}.pending-document label{display:flex;align-items:center;gap:.4rem}.pending-document select{max-width:18rem}.error{color:var(--s2s-danger,#a32929)}}
 details.s2s-panel{margin-bottom:1rem;>summary{font-size:1.1rem;font-weight:700}}
 .item,.vessel-card{border:1px solid var(--s2s-border);border-radius:.5rem;padding:1rem;margin:.75rem 0}
 .item-heading{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;margin-bottom:.75rem}

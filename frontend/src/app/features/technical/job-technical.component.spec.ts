@@ -1,12 +1,52 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpResponse } from '@angular/common/http';
 import { provideTranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { LookupService } from '../../core/lookups/lookup.service';
 import { JobTechnicalComponent } from './job-technical.component';
-import { JobDocument, JobRequest, JobTechnicalJob, JobTechnicalService } from './job-technical.service';
+import { JobDocument, JobRequest, JobTechnicalJob, JobTechnicalService, RequestItem } from './job-technical.service';
 
 describe('JobTechnicalComponent', () => {
+  it('uploads confirmed email attachments one at a time to their selected request items', () => {
+    const uploaded: string[] = [];
+    const item = { id: 'item-1', jobVesselId: null, code: 'OTHER', label: 'Owner document', kind: 'DOCUMENT',
+      documentTypeId: 'type-1', required: true, status: 'PENDING', responseText: null, reviewComment: null,
+      documentVersionIds: [], version: 0, events: [] } as RequestItem;
+    const request: JobRequest = { id: 'request-1', jobId: 'job-1', status: 'OPEN', templateVersion: null, items: [item], version: 0 };
+    TestBed.configureTestingModule({ providers: [
+      provideTranslateService(),
+      { provide: AuthService, useValue: { hasPermission: () => true, currentUser: () => null } },
+      { provide: LookupService, useValue: { documentTypes: () => of([]) } },
+      { provide: JobTechnicalService, useValue: {
+        job: () => of({ id: 'job-1', jobNumber: 'JOB-1', vessels: [] }),
+        request: () => of(request), documents: () => of([]), review: () => of(null),
+        voyageFields: () => of([]), checklists: () => of([]), templates: () => of([]),
+        upload: (_jobId: string, _item: unknown, file: File) => {
+          uploaded.push(file.name);
+          return of(new HttpResponse({ body: { id: file.name } }));
+        },
+      } },
+    ] });
+    TestBed.overrideComponent(JobTechnicalComponent, { set: { template: '' } });
+    const fixture = TestBed.createComponent(JobTechnicalComponent);
+    fixture.componentRef.setInput('jobId', 'job-1');
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component['queueDocuments']([
+      new File(['%PDF-1.4'], 'first.pdf', { type: 'application/pdf' }),
+      new File(['%PDF-1.4'], 'second.pdf', { type: 'application/pdf' }),
+    ]);
+    expect(component['canImportDocuments']()).toBe(false);
+    component['setDocumentTarget'](0, 'item-1');
+    component['setDocumentTarget'](1, 'item-1');
+    component['importDocuments']();
+    expect(uploaded).toEqual(['first.pdf', 'second.pdf']);
+    expect(component['pendingDocuments']()).toEqual([]);
+    expect(component['notice']()).toContain('2 documents uploaded');
+    fixture.destroy();
+  });
+
   it('clears the old job and cancels its detail and write requests on job change', () => {
     const firstJob = new Subject<JobTechnicalJob>();
     const secondJob = new Subject<JobTechnicalJob>();

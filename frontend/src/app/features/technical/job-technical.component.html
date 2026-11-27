@@ -64,6 +64,40 @@
     <p>{{ 'jobDocuments.pendingTemplate' | translate }}</p>
     @if (canWrite()) { <button type="button" [disabled]="busy()" (click)="startRequest()">{{ 'jobDocuments.createFromTemplate' | translate }}</button> }
   } @else {
+    @if (canWrite() && documentTargets().length) {
+      <section class="bulk-documents" aria-label="Upload email attachments">
+        <div class="drop-zone" (dragover)="allowDocumentDrop($event)" (drop)="dropDocuments($event)">
+          <strong>Upload attachments from Outlook</strong>
+          <p>Drag the attached PDF or image files here together. No need to save each file on your computer.</p>
+          <label class="pick-files">Or choose files
+            <input type="file" multiple accept="application/pdf,image/png,image/jpeg" [disabled]="busy()" (change)="chooseDocuments($event)" />
+          </label>
+        </div>
+        @if (pendingDocuments().length) {
+          <div class="pending-documents">
+            <h3>Confirm each attachment</h3>
+            @for (row of pendingDocuments(); track row.file; let i = $index) {
+              <div class="pending-document">
+                <span>{{ row.file.name }}</span>
+                <label>Document and vessel
+                  <select [ngModel]="row.itemId" (ngModelChange)="setDocumentTarget(i, $event)" [disabled]="busy()">
+                    <option [ngValue]="null">Select destination</option>
+                    @for (target of documentTargets(); track target.value) {
+                      <option [ngValue]="target.value">{{ target.label }}</option>
+                    }
+                  </select>
+                </label>
+                <button type="button" [disabled]="busy()" (click)="removePendingDocument(i)">Remove</button>
+                @if (row.error) { <span class="error" role="alert">{{ row.error }}</span> }
+              </div>
+            }
+            <button type="button" [disabled]="busy() || !canImportDocuments()" (click)="importDocuments()">
+              Upload {{ pendingDocuments().length }} confirmed attachment{{ pendingDocuments().length === 1 ? '' : 's' }}
+            </button>
+          </div>
+        }
+      </section>
+    }
     <div class="tick-grid" role="table" aria-label="Documents received from each vessel">
       <div class="tick-row head" role="row">
         <span role="columnheader">Document / Checklist</span>
