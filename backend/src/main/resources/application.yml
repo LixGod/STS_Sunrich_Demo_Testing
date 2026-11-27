@@ -79,12 +79,6 @@ springdoc:
 
 ship2ship:
   incoming-mail:
-    enabled: ${IMAP_ENABLED:false}
-    host: ${IMAP_HOST:}
-    port: ${IMAP_PORT:993}
-    username: ${IMAP_USERNAME:}
-    password: ${IMAP_PASSWORD:}
-    folder: ${IMAP_FOLDER:INBOX}
     poll-ms: ${IMAP_POLL_MS:120000}
   company:
     # Printed on quotations, invoices and the FDA; the base currency converts job costs; the time zone sets the numbering year.

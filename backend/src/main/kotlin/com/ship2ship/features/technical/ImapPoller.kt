@@ -7,8 +7,6 @@ import jakarta.mail.Part
 import jakarta.mail.Session
 import jakarta.mail.UIDFolder
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.security.MessageDigest
@@ -16,25 +14,15 @@ import java.util.Properties
 
 /** Reads the configured mailbox without changing messages. Filing always requires an operator. */
 @Component
-@ConditionalOnProperty(prefix = "ship2ship.incoming-mail", name = ["enabled"], havingValue = "true")
 class ImapPoller(
     private val intake: IncomingMailService,
-    @Value("\${ship2ship.incoming-mail.host}") private val host: String,
-    @Value("\${ship2ship.incoming-mail.port:993}") private val port: Int,
-    @Value("\${ship2ship.incoming-mail.username}") private val username: String,
-    @Value("\${ship2ship.incoming-mail.password}") private val password: String,
-    @Value("\${ship2ship.incoming-mail.folder:INBOX}") private val folderName: String,
+    private val connection: MailboxConnectionService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    init {
-        require(host.isNotBlank() && username.isNotBlank() && password.isNotBlank()) {
-            "IMAP_ENABLED requires IMAP_HOST, IMAP_USERNAME, and IMAP_PASSWORD."
-        }
-    }
-
     @Scheduled(fixedDelayString = "\${ship2ship.incoming-mail.poll-ms:120000}", initialDelay = 10000)
     fun poll() {
+        val account = connection.active() ?: return
         val properties = Properties().apply {
             put("mail.store.protocol", "imaps")
             put("mail.imaps.ssl.enable", "true")
@@ -45,12 +33,12 @@ class ImapPoller(
         }
         val store = Session.getInstance(properties).getStore("imaps")
         try {
-            store.connect(host, port, username, password)
-            val folder = store.getFolder(folderName)
+            store.connect(account.host, account.port, account.username, account.password)
+            val folder = store.getFolder(account.folder)
             try {
                 folder.open(Folder.READ_ONLY)
                 val uidFolder = folder as? UIDFolder ?: error("The configured IMAP folder has no stable message IDs.")
-                val mailboxKey = sha256("$host:$port:$username:$folderName:${uidFolder.uidValidity}")
+                val mailboxKey = sha256("${account.host}:${account.port}:${account.username}:${account.folder}:${uidFolder.uidValidity}")
                 val total = folder.messageCount
                 if (total == 0) return
                 for (message in folder.getMessages(maxOf(1, total - 99), total)) {

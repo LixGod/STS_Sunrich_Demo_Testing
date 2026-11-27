@@ -7,7 +7,6 @@ import com.ship2ship.core.security.Permissions
 import com.ship2ship.core.web.BadRequestException
 import com.ship2ship.core.web.ConflictException
 import com.ship2ship.core.web.NotFoundException
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.ResponseEntity
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
@@ -42,12 +41,12 @@ class IncomingMailService(
     private val policy: AccessPolicy,
     private val documents: JobDocumentService,
     private val clock: Clock,
-    @Value("\${ship2ship.incoming-mail.enabled:false}") private val enabled: Boolean,
+    private val connection: MailboxConnectionService,
 ) {
     @Transactional(readOnly = true)
     fun enabled(): Boolean {
         policy.requireGlobal(Permissions.DOCUMENT_WRITE, "INCOMING_MAIL")
-        return enabled
+        return connection.enabled()
     }
 
     @Transactional(readOnly = true)

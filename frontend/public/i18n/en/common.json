@@ -37,6 +37,8 @@
     "reports": "Reports & History",
     "admin": "Admin",
     "stsAdmin": "STS Admin",
+    "general": "General",
+    "mailboxConnection": "Mailbox connection",
     "superAdmin": "Super Admin",
     "organizationMasters": "Organization",
     "commercialMasters": "Commercial setup",

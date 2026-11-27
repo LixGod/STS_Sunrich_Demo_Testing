@@ -31,6 +31,13 @@ function masterList(path: string, configId: keyof typeof MASTER_LISTS, permissio
 export const ADMINISTRATION_ROUTES: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'branches' },
   {
+    path: 'mailbox',
+    canMatch: [() => inject(AuthService).hasGlobalPermission(Permissions.masterTechnicalWrite)
+      ? true : inject(Router).createUrlTree(['/access-denied'])],
+    loadComponent: () => import('./mailbox/mailbox-connection.component').then(m => m.MailboxConnectionComponent),
+    data: { breadcrumb: 'nav.mailboxConnection' },
+  },
+  {
     path: 'users',
     canMatch: [permissionGuard(Permissions.adminUserRead)],
     data: { breadcrumb: 'nav.users' },

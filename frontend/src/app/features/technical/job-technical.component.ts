@@ -170,7 +170,7 @@ export class JobTechnicalComponent {
     this.api.incomingMailStatus().pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: status => {
         this.mailEnabled.set(status.enabled);
-        if (status.enabled) this.api.incomingAttachments().pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef))
+        this.api.incomingAttachments().pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef))
           .subscribe({ next: rows => this.incomingAttachments.set(rows), error: () => this.error.set('Could not load incoming mail.') });
       },
       error: () => this.mailEnabled.set(false),

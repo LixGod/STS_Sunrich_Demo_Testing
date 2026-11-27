@@ -98,7 +98,7 @@
         }
       </section>
     }
-    @if (canWrite() && mailEnabled()) {
+    @if (canWrite() && (mailEnabled() || incomingAttachments().length)) {
       <section class="bulk-documents" aria-label="Incoming mailbox attachments">
         <div class="section-heading">
           <h3>Incoming mail · confirm each attachment</h3>

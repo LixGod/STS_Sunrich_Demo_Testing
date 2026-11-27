@@ -1,19 +1,9 @@
 # Incoming mail for Step 4
 
-STS can poll one IMAP mailbox and show its PDF, PNG, and JPEG attachments in the Step 4 review queue. Operators choose the job page, vessel, and request item for **each** attachment before filing. The original emails stay in the mailbox and are not marked as read. Manual upload remains available regardless of mailbox configuration.
+In STS Admin → General → Mailbox connection, enter the IMAP server, port, mailbox login, and password or app password. Use **Test connection**, then **Connect mailbox**. The app reads the main `INBOX` over IMAPS and checks about every two minutes. Each PDF, PNG, or JPEG attachment waits in the Step 4 review queue until Operations chooses its job, vessel, and document item. Emails stay unread and are never deleted or answered. Manual upload remains available.
 
-Set these environment variables on the backend service:
+The backend needs one server secret, `IMAP_CREDENTIAL_KEY`, containing a Base64 encoded random 32 byte key. This encrypts mailbox passwords in the database with AES-GCM. Keep the key backed up securely: losing or rotating it makes the saved mailbox password unreadable, requiring a new connection. The password is never returned by the API.
 
-| Variable | Value |
-| --- | --- |
-| `IMAP_ENABLED` | `true` after all details are ready; defaults to `false` |
-| `IMAP_HOST` | Mail server hostname |
-| `IMAP_PORT` | IMAPS port, normally `993` |
-| `IMAP_USERNAME` | Mailbox address or server login name |
-| `IMAP_PASSWORD` | Mailbox password or app password; store only as a server secret |
-| `IMAP_FOLDER` | `INBOX` (default) |
-| `IMAP_POLL_MS` | Poll interval in milliseconds (default `120000`) |
+To stop reading mail, use **Disconnect** in the app. The saved credentials remain encrypted for a later reconnection. Attachments already in the review queue remain pending. The poller reads up to the newest 100 messages per cycle and skips inline images, unsupported types, and attachments above 15 MiB. Mailbox settings require company-wide `MASTER.TECHNICAL.WRITE`; the shared review queue requires company-wide `DOCUMENT.WRITE` and normal access to the selected job and branch.
 
-The mailbox poller reads up to the newest 100 messages each cycle. Attachments larger than 15 MiB, inline images, and unsupported file types are skipped. Filing requires company-wide `DOCUMENT.WRITE` plus write access to the selected job and branch. This keeps a shared mailbox queue from being exposed to branch-scoped accounts.
-
-To disconnect the mailbox immediately, set `IMAP_ENABLED=false` and restart the backend. The manual upload stays usable. The mailbox feature is in its own Git commit, separate from the manual upload, so its code can be reverted without removing manual upload.
+The manual upload and mailbox intake were committed separately, so mailbox code can be reverted without removing manual upload.

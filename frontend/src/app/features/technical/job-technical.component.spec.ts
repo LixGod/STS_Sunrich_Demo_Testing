@@ -61,6 +61,7 @@ describe('JobTechnicalComponent', () => {
         job: () => of({ id: 'job-1', jobNumber: 'JOB-1', vessels: [] }),
         request: () => of(request), documents: () => of([]), review: () => of(null),
         incomingMailStatus: () => of({ enabled: false }),
+        incomingAttachments: () => of([]),
         voyageFields: () => of([]), checklists: () => of([]), templates: () => of([]),
         upload: (_jobId: string, _item: unknown, file: File) => {
           uploaded.push(file.name);

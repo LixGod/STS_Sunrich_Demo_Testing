@@ -80,6 +80,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     icon: 'pi pi-cog',
     items: [],
     sections: [
+      { labelKey: 'nav.general', items: [
+        { labelKey: 'nav.mailboxConnection', route: '/administration/mailbox', permissions: [Permissions.masterTechnicalWrite], globalOnly: true },
+      ] },
       { labelKey: 'nav.organizationMasters', items: [
         { labelKey: 'nav.branches', route: '/administration/branches', permissions: [Permissions.masterOrgRead] },
       ] },

@@ -33,6 +33,7 @@ export class SideNavComponent {
           ?.map((section) => ({
             ...section,
             items: section.items.filter((item) => this.auth.hasAnyPermission(item.permissions) &&
+              (!item.globalOnly || item.permissions.some(permission => this.auth.hasGlobalPermission(permission))) &&
               (group.id !== 'sts-admin' || section.labelKey === 'nav.operationsSetup' || setupAccess(item.permissions))),
           }))
           .filter((section) => section.items.length > 0),
