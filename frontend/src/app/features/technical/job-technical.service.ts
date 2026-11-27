@@ -21,6 +21,10 @@ export interface JobDocument {
   id: string; jobVesselId: string | null; documentTypeId: string; versionNo: number;
   fileId: string; fileName: string; contentType: string; scanState: string; uploadedAt: string;
 }
+export interface IncomingAttachment {
+  id: string; fileName: string; contentType: string; sizeBytes: number;
+  sender: string | null; subject: string | null; receivedAt: string | null;
+}
 export interface EmailPreview { subject: string; body: string; unresolved: string[]; templateVersion: number }
 export interface VoyageField { code: string; label: string; unit: string; requiredForReview: boolean }
 export interface VoyageValue { fieldCode: string; value: string; sourceDocumentId: string | null; sourcePage: number | null; verified: boolean }
@@ -69,6 +73,15 @@ export class JobTechnicalService {
   }
   email(jobId: string): Observable<EmailPreview> { return this.http.get<EmailPreview>(`${this.path(jobId)}/request/email-preview`); }
   documents(jobId: string): Observable<JobDocument[]> { return this.http.get<JobDocument[]>(`${this.path(jobId)}/documents`); }
+  incomingMailStatus(): Observable<{ enabled: boolean }> {
+    return this.http.get<{ enabled: boolean }>(`${this.base}/technical/incoming-mail/status`);
+  }
+  incomingAttachments(): Observable<IncomingAttachment[]> {
+    return this.http.get<IncomingAttachment[]>(`${this.base}/technical/incoming-mail`);
+  }
+  fileIncomingAttachment(id: string, jobId: string, itemId: string): Observable<JobDocument> {
+    return this.http.post<JobDocument>(`${this.base}/technical/incoming-mail/${id}/file`, { jobId, itemId });
+  }
   upload(jobId: string, item: RequestItem, file: File): Observable<HttpEvent<JobDocument>> {
     const form = new FormData();
     if (item.jobVesselId) form.append('jobVesselId', item.jobVesselId);

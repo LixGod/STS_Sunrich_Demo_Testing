@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { HttpEventType } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -10,7 +11,7 @@ import { uploadProblem } from '../../core/files/upload-validation';
 import { LookupService, LookupOption } from '../../core/lookups/lookup.service';
 import { Subject, catchError, concatMap, filter, forkJoin, from, map, of, take, takeUntil } from 'rxjs';
 import { DocumentViewerComponent, ViewableFile } from '../../shared/components/document-viewer/document-viewer.component';
-import { JobDocument, JobRequest, JobTechnicalJob, JobTechnicalService, RequestItem,
+import { IncomingAttachment, JobDocument, JobRequest, JobTechnicalJob, JobTechnicalService, RequestItem,
   VoyageField, VoyageVersion, CompatibilityReview, EmailPreview, ChecklistResponse, ChecklistTemplate } from './job-technical.service';
 
 interface EditableValue { value: string; sourceDocumentId: string | null; sourcePage: number | null }
@@ -18,7 +19,7 @@ interface PendingDocument { file: File; itemId: string | null; error: string | n
 
 @Component({
   selector: 's2s-job-technical',
-  imports: [FormsModule, RouterLink, TranslatePipe, DocumentViewerComponent],
+  imports: [FormsModule, RouterLink, TranslatePipe, DecimalPipe, DocumentViewerComponent],
   templateUrl: './job-technical.component.html',
   styleUrl: './job-technical.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,6 +61,9 @@ export class JobTechnicalComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly pendingDocuments = signal<PendingDocument[]>([]);
+  protected readonly mailEnabled = signal(false);
+  protected readonly incomingAttachments = signal<IncomingAttachment[]>([]);
+  protected readonly mailTargets = signal<Record<string, string>>({});
   protected readonly canImportDocuments = computed(() => this.pendingDocuments().length > 0 && this.pendingDocuments().every(row => !!row.itemId));
   protected readonly canWrite = computed(() => this.auth.hasPermission(Permissions.techJobWrite));
   protected readonly canReview = computed(() => this.auth.hasPermission(Permissions.techJobReview));
@@ -152,12 +156,50 @@ export class JobTechnicalComponent {
       this.extraItem.update(item => ({ ...item, code: '', label: '', jobVesselId: '', documentTypeId: '', reason: '' }));
       this.viewing.set(null); this.busy.set(false); this.notice.set(null);
       this.pendingDocuments.set([]);
+      this.mailTargets.set({});
     }
     this.error.set(null);
     this.api.job(id).pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (job) => { this.job.set(job); this.loadDetails(id, job); },
       error: () => this.error.set('Unable to load this job.'),
     });
+    if (this.canWrite()) this.loadIncomingMail();
+  }
+
+  protected loadIncomingMail(): void {
+    this.api.incomingMailStatus().pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: status => {
+        this.mailEnabled.set(status.enabled);
+        if (status.enabled) this.api.incomingAttachments().pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef))
+          .subscribe({ next: rows => this.incomingAttachments.set(rows), error: () => this.error.set('Could not load incoming mail.') });
+      },
+      error: () => this.mailEnabled.set(false),
+    });
+  }
+
+  protected setMailTarget(id: string, itemId: string): void {
+    this.mailTargets.update(targets => ({ ...targets, [id]: itemId }));
+  }
+
+  protected fileIncomingAttachment(row: IncomingAttachment): void {
+    const itemId = this.mailTargets()[row.id];
+    if (!itemId || this.busy()) return;
+    const jobId = this.jobId();
+    this.busy.set(true); this.error.set(null);
+    this.api.fileIncomingAttachment(row.id, jobId, itemId)
+      .pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => {
+          this.busy.set(false);
+          this.incomingAttachments.update(rows => rows.filter(candidate => candidate.id !== row.id));
+          this.notice.set(`${row.fileName} filed to ${this.job()?.jobNumber} and marked received.`);
+          forkJoin([this.api.request(jobId), this.api.documents(jobId), this.api.review(jobId)])
+            .pipe(takeUntil(this.jobChanged), takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: ([request, documents, review]) => {
+              this.request.set(request); this.documents.set(documents); this.review.set(review);
+            }, error: () => this.error.set('Attachment filed. Reload to see the updated request.') });
+        },
+        error: () => { this.busy.set(false); this.error.set('Could not file this attachment. Check its destination and try again.'); },
+      });
   }
 
   private loadDetails(id: string, job: JobTechnicalJob): void {

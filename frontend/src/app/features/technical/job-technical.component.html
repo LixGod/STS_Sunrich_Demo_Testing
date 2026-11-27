@@ -98,6 +98,33 @@
         }
       </section>
     }
+    @if (canWrite() && mailEnabled()) {
+      <section class="bulk-documents" aria-label="Incoming mailbox attachments">
+        <div class="section-heading">
+          <h3>Incoming mail · confirm each attachment</h3>
+          <button type="button" [disabled]="busy()" (click)="loadIncomingMail()">Refresh inbox</button>
+        </div>
+        <p>File each attachment to the correct job, vessel, and document item. Current job: <strong>{{ job()?.jobNumber }}</strong>.</p>
+        @if (!incomingAttachments().length) { <p>No attachments are waiting for review.</p> }
+        @for (row of incomingAttachments(); track row.id) {
+          <div class="pending-document mail-document">
+            <div class="mail-detail">
+              <strong>{{ row.fileName }}</strong>
+              <small>{{ row.sender || 'Unknown sender' }} · {{ row.subject || 'No subject' }} · {{ row.sizeBytes / 1024 | number:'1.0-0' }} KB</small>
+            </div>
+            <label>Document and vessel
+              <select [ngModel]="mailTargets()[row.id] || ''" (ngModelChange)="setMailTarget(row.id, $event)" [disabled]="busy()">
+                <option value="">Select destination</option>
+                @for (target of documentTargets(); track target.value) {
+                  <option [value]="target.value">{{ target.label }}</option>
+                }
+              </select>
+            </label>
+            <button type="button" [disabled]="busy() || !mailTargets()[row.id]" (click)="fileIncomingAttachment(row)">File to {{ job()?.jobNumber }}</button>
+          </div>
+        }
+      </section>
+    }
     <div class="tick-grid" role="table" aria-label="Documents received from each vessel">
       <div class="tick-row head" role="row">
         <span role="columnheader">Document / Checklist</span>

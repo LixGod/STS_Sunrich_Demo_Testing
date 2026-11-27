@@ -34,6 +34,7 @@ dependencies {
 	implementation("org.thymeleaf:thymeleaf")
 	implementation("io.github.openhtmltopdf:openhtmltopdf-pdfbox:1.1.87")
 	implementation("org.apache.poi:poi-ooxml:5.5.1")
+	implementation("org.eclipse.angus:jakarta.mail:2.0.4")
 	runtimeOnly("com.mysql:mysql-connector-j")
 	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
